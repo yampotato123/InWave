@@ -1,31 +1,407 @@
-html {
-  font-size: 14px;
+/* ============================================================
+   MyMusicBuddy — 對齊 YouTube Music 的暗色版面
+   色票:背景 #030303 / 面板 #1C1C1C / 邊線 #3D3D3D
+        文字 #FFFFFF / 次要 #AAAAAA / 品牌紅 #FF0033(只用在 logo 與作用中狀態)
+   ============================================================ */
+
+:root {
+  --mb-bg: #030303;
+  --mb-surface: #1c1c1c;
+  --mb-surface-hover: #2a2a2a;
+  --mb-border: #3d3d3d;
+  --mb-text: #ffffff;
+  --mb-muted: #aaaaaa;
+  --mb-red: #ff0033;
+  --mb-sidebar-width: 232px;
 }
 
-@media (min-width: 768px) {
-  html {
-    font-size: 16px;
-  }
-}
-
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
-}
-
-html {
-  position: relative;
-  min-height: 100%;
-}
+html { font-size: 16px; }
 
 body {
-  margin-bottom: 60px;
+  margin: 0;
+  background: var(--mb-bg);
+  color: var(--mb-text);
+  font-family: Roboto, "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
 }
 
-.form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
-  color: var(--bs-secondary-color);
-  text-align: end;
+/* ---------- 版面骨架:左側欄 + 主內容 ---------- */
+
+.mb-shell { display: flex; min-height: 100vh; }
+
+.mb-sidebar {
+  width: var(--mb-sidebar-width);
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  padding: 16px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
-  text-align: start;
+.mb-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px 20px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: var(--mb-text);
+  text-decoration: none;
+}
+.mb-logo:hover { color: var(--mb-text); }
+
+/* 紅底白三角的播放徽記 */
+.mb-logo-badge {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--mb-red);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.mb-logo-badge::before {
+  content: "";
+  border-style: solid;
+  border-width: 6px 0 6px 10px;
+  border-color: transparent transparent transparent #fff;
+  margin-left: 2px;
+}
+
+.mb-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  color: var(--mb-text);
+  text-decoration: none;
+  font-size: 14px;
+}
+.mb-nav-item svg { width: 24px; height: 24px; flex-shrink: 0; }
+.mb-nav-item:hover { background: var(--mb-surface); color: var(--mb-text); }
+.mb-nav-item.active { background: var(--mb-surface); font-weight: 500; }
+
+.mb-main {
+  flex-grow: 1;
+  min-width: 0;
+  padding: 24px 32px 48px;
+}
+
+/* 手機:側欄變頂欄 */
+@media (max-width: 767px) {
+  .mb-shell { flex-direction: column; }
+  .mb-sidebar {
+    width: 100%;
+    height: auto;
+    position: static;
+    flex-direction: row;
+    align-items: center;
+    padding: 8px 12px;
+    overflow-x: auto;
+  }
+  .mb-logo { padding: 8px 12px; }
+  .mb-nav-item { gap: 8px; padding: 8px 12px; white-space: nowrap; }
+  .mb-main { padding: 16px; }
+}
+
+/* ---------- 標題階層 ---------- */
+
+.mb-page-title {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+  margin: 8px 0 24px;
+  text-wrap: balance;
+}
+.mb-section-title { font-size: 20px; font-weight: 700; margin: 0 0 16px; }
+.mb-muted { color: var(--mb-muted); }
+
+/* ---------- YT 風格濾鏡 chips(情緒選擇) ---------- */
+
+.mb-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.mb-chip {
+  display: inline-block;
+  padding: 7px 14px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid transparent;
+  color: var(--mb-text);
+  font-size: 14px;
+  cursor: pointer;
+  user-select: none;
+}
+.mb-chip:hover { background: rgba(255, 255, 255, 0.15); }
+
+/* 被選中的 chip:YT 的反白樣式 */
+.btn-check:checked + .mb-chip {
+  background: #fff;
+  color: #030303;
+  font-weight: 500;
+}
+.btn-check:focus-visible + .mb-chip { border-color: var(--mb-red); }
+
+/* ---------- 按鈕:白色膠囊(主要)、描邊膠囊(次要) ---------- */
+
+.mb-btn {
+  display: inline-block;
+  padding: 9px 22px;
+  border-radius: 20px;
+  border: none;
+  background: #fff;
+  color: #030303;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+}
+.mb-btn:hover { background: #d9d9d9; color: #030303; }
+
+.mb-btn-outline {
+  background: transparent;
+  color: var(--mb-text);
+  border: 1px solid var(--mb-border);
+}
+.mb-btn-outline:hover { background: var(--mb-surface); color: var(--mb-text); }
+
+.mb-btn:focus-visible, .mb-btn-outline:focus-visible {
+  outline: 2px solid var(--mb-red);
+  outline-offset: 2px;
+}
+
+/* ---------- 作品卡片牆 ---------- */
+
+.mb-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 24px 16px;
+}
+
+.mb-card { text-decoration: none; color: var(--mb-text); display: block; }
+
+.mb-card-thumb {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--mb-surface);
+}
+.mb-card-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* 懸停時的播放圓鈕,YT 卡片的招牌互動 */
+.mb-card-thumb::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.mb-card-play {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(3, 3, 3, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 1;
+}
+.mb-card-play::before {
+  content: "";
+  border-style: solid;
+  border-width: 7px 0 7px 12px;
+  border-color: transparent transparent transparent #fff;
+  margin-left: 3px;
+}
+.mb-card:hover .mb-card-thumb::after { opacity: 1; }
+.mb-card:hover .mb-card-play { opacity: 1; transform: translateY(0); }
+
+.mb-card-title {
+  margin: 10px 0 2px;
+  font-size: 15px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mb-card-sub { font-size: 13px; color: var(--mb-muted); }
+
+/* ---------- 歌曲列(推薦頁、作品頁共用) ---------- */
+
+.mb-song-list { list-style: none; margin: 0; padding: 0; }
+
+.mb-song-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+.mb-song-row:hover { background: var(--mb-surface); }
+.mb-song-row.playable { cursor: pointer; }
+
+.mb-song-thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.mb-song-main { flex-grow: 1; min-width: 0; }
+.mb-song-title {
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mb-song-artist { font-size: 13px; color: var(--mb-muted); }
+
+.mb-song-row .form-check-input {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  background-color: transparent;
+  border-color: var(--mb-muted);
+}
+.mb-song-row .form-check-input:checked {
+  background-color: #fff;
+  border-color: #fff;
+}
+/* 勾選符號在白底上要是黑的 */
+.mb-song-row .form-check-input:checked[type="checkbox"] {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%23030303' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m6 10 3 3 6-6'/%3e%3c/svg%3e");
+}
+
+/* ---------- 播放器容器 ---------- */
+
+.mb-player {
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--mb-surface);
+}
+
+/* ---------- 表單控件的暗色化 ---------- */
+
+.mb-input {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid var(--mb-border);
+  border-radius: 0;
+  color: var(--mb-text);
+  font-size: 18px;
+  padding: 8px 2px;
+  width: 100%;
+}
+.mb-input:focus {
+  outline: none;
+  border-bottom-color: #fff;
+  background: transparent;
+  color: var(--mb-text);
+  box-shadow: none;
+}
+.mb-input::placeholder { color: var(--mb-muted); }
+
+.mb-file-drop {
+  border: 1px dashed var(--mb-border);
+  border-radius: 12px;
+  background: var(--mb-surface);
+  padding: 28px 24px;
+}
+.mb-file-drop .form-control {
+  background: transparent;
+  border: none;
+  color: var(--mb-text);
+  padding: 0;
+}
+.mb-file-drop .form-control::file-selector-button {
+  background: #fff;
+  color: #030303;
+  border: none;
+  border-radius: 18px;
+  padding: 8px 18px;
+  margin-right: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+/* 驗證訊息 */
+.mb-errors ul { margin: 0; padding-left: 18px; }
+.mb-errors { color: #ff6679; margin-bottom: 16px; }
+.validation-summary-valid { display: none; }
+
+/* 空狀態 */
+.mb-empty {
+  border: 1px dashed var(--mb-border);
+  border-radius: 12px;
+  padding: 56px 24px;
+  text-align: center;
+  color: var(--mb-muted);
+}
+.mb-empty a { color: var(--mb-text); }
+
+/* ---------- 小號膠囊鈕(歌曲列的「試聽」) ---------- */
+
+.mb-btn-sm { padding: 5px 14px; font-size: 13px; flex-shrink: 0; }
+
+/* ---------- 底部播放列(作品頁) ---------- */
+
+.mb-playerbar {
+  position: fixed;
+  inset: auto 0 0 0;
+  height: 72px;
+  background: #212121;
+  border-top: 1px solid var(--mb-border);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 16px;
+  z-index: 100;
+}
+
+.mb-playerbar-controls { display: flex; align-items: center; gap: 4px; }
+
+.mb-iconbtn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--mb-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.mb-iconbtn svg { width: 22px; height: 22px; }
+.mb-iconbtn:hover { background: var(--mb-surface-hover); }
+.mb-iconbtn:focus-visible { outline: 2px solid var(--mb-red); outline-offset: 2px; }
+.mb-iconbtn-lg { width: 48px; height: 48px; }
+.mb-iconbtn-lg svg { width: 30px; height: 30px; }
+
+.mb-now-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+/* 正在播放的歌曲列 */
+.mb-song-row.active { background: var(--mb-surface); }
+.mb-song-row.active .mb-song-title { color: var(--mb-red); }
+
+@media (prefers-reduced-motion: reduce) {
+  .mb-card-thumb::after, .mb-card-play { transition: none; }
 }

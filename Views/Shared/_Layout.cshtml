@@ -1,47 +1,49 @@
-﻿<!DOCTYPE html>
-<html lang="zh-Hant">
+<!DOCTYPE html>
+@{
+    var currentController = (string?)ViewContext.RouteData.Values["controller"];
+    var currentAction = (string?)ViewContext.RouteData.Values["action"];
+    string NavClass(string controller, string action) =>
+        "mb-nav-item" + (controller == currentController && action == currentAction ? " active" : "");
+}
+<html lang="zh-Hant" data-bs-theme="dark">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - MyMusicBuddy</title>
-    <script type="importmap"></script>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/MyMusicBuddy.styles.css" asp-append-version="true" />
 </head>
 <body>
-    <header>
-        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
-            <div class="container-fluid">
-                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">MyMusicBuddy</a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
-                        aria-expanded="false" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
-                    <ul class="navbar-nav flex-grow-1">
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Works" asp-action="Create">建立新作品</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Works" asp-action="Index">我的作品</a>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-        </nav>
-    </header>
-    <div class="container">
-        <main role="main" class="pb-3">
+    <div class="mb-shell">
+        <aside class="mb-sidebar">
+            <a class="mb-logo" asp-controller="Home" asp-action="Index">
+                <span class="mb-logo-badge"></span>MusicBuddy
+            </a>
+            <a class="@NavClass("Home", "Index")" asp-controller="Home" asp-action="Index">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                    <path d="M4 11l8-7 8 7v9h-5.5v-6h-5v6H4z" stroke-linejoin="round" />
+                </svg>
+                首頁
+            </a>
+            <a class="@NavClass("Works", "Create")" asp-controller="Works" asp-action="Create">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                    <circle cx="12" cy="12" r="8.5" />
+                    <path d="M12 8.5v7M8.5 12h7" stroke-linecap="round" />
+                </svg>
+                建立新作品
+            </a>
+            <a class="@NavClass("Works", "Index")" asp-controller="Works" asp-action="Index">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                    <path d="M6 4.5h12a1 1 0 0 1 1 1V20l-7-4.2L5 20V5.5a1 1 0 0 1 1-1z" stroke-linejoin="round" />
+                </svg>
+                我的作品
+            </a>
+        </aside>
+        <main class="mb-main">
             @RenderBody()
         </main>
     </div>
-
-    <footer class="border-top footer text-muted">
-        <div class="container">
-            &copy; 2026 - MyMusicBuddy - <a asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
-        </div>
-    </footer>
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>

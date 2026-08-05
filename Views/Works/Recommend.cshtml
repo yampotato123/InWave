@@ -3,22 +3,22 @@
     ViewData["Title"] = "推薦歌單";
 }
 
-<h1 class="mb-4">為你的「@Model.MoodName」推薦</h1>
+<h1 class="mb-page-title">為你的「@Model.MoodName」推薦</h1>
 
 <div class="row g-4">
-    <div class="col-md-4">
-        <img src="@Model.PhotoPath" class="img-fluid rounded shadow-sm" alt="作品照片" />
-        <p class="text-muted mt-2 small">搜尋關鍵字:@Model.SearchKeyword</p>
+    <div class="col-lg-4">
+        <img src="@Model.PhotoPath" class="img-fluid rounded-3" alt="作品照片" />
+        <p class="mb-muted mt-2" style="font-size: 13px">搜尋關鍵字:@Model.SearchKeyword</p>
 
-        @* 試聽用播放器:按歌曲旁的「試聽」會把影片載入這裡 *@
-        <div class="ratio ratio-16x9 mt-3">
+        @* 試聽用播放器:按歌曲列的「試聽」會把影片載入這裡 *@
+        <div class="mb-player ratio ratio-16x9 mt-2">
             <iframe id="preview-player" src="" title="試聽" allowfullscreen
                     allow="autoplay; encrypted-media"></iframe>
         </div>
     </div>
 
-    <div class="col-md-8">
-        <div asp-validation-summary="All" class="text-danger mb-3"></div>
+    <div class="col-lg-8">
+        <div asp-validation-summary="All" class="mb-errors"></div>
 
         <form asp-action="SavePlaylist" method="post">
             <input type="hidden" asp-for="PhotoId" />
@@ -26,27 +26,27 @@
             <input type="hidden" asp-for="MoodName" />
             <input type="hidden" asp-for="SearchKeyword" />
 
-            <div class="mb-3">
-                <label asp-for="PlaylistName" class="form-label fw-bold">歌單名稱</label>
-                <input asp-for="PlaylistName" class="form-control" />
+            <div class="mb-4">
+                <input asp-for="PlaylistName" class="mb-input" placeholder="歌單名稱" />
             </div>
 
-            <ul class="list-group mb-3">
+            <ul class="mb-song-list mb-4">
                 @for (var i = 0; i < Model.Songs.Count; i++)
                 {
-                    <li class="list-group-item d-flex align-items-center gap-3">
+                    <li class="mb-song-row">
                         <input type="hidden" asp-for="Songs[i].VideoId" />
                         <input type="hidden" asp-for="Songs[i].Title" />
                         <input type="hidden" asp-for="Songs[i].Artist" />
                         <input type="hidden" asp-for="Songs[i].ThumbnailUrl" />
 
-                        <input class="form-check-input mt-0" type="checkbox" asp-for="Songs[i].Selected" />
-                        <img src="@Model.Songs[i].ThumbnailUrl" width="80" class="rounded" alt="" />
-                        <div class="flex-grow-1">
-                            <div>@Model.Songs[i].Title</div>
-                            <small class="text-muted">@Model.Songs[i].Artist</small>
+                        <input class="form-check-input" type="checkbox" asp-for="Songs[i].Selected"
+                               title="加入歌單" />
+                        <img src="@Model.Songs[i].ThumbnailUrl" class="mb-song-thumb" alt="" />
+                        <div class="mb-song-main">
+                            <div class="mb-song-title">@Model.Songs[i].Title</div>
+                            <div class="mb-song-artist">@Model.Songs[i].Artist</div>
                         </div>
-                        <button type="button" class="btn btn-sm btn-outline-secondary preview-btn"
+                        <button type="button" class="mb-btn mb-btn-outline mb-btn-sm preview-btn"
                                 data-video-id="@Model.Songs[i].VideoId">試聽</button>
                     </li>
                 }
@@ -54,12 +54,12 @@
 
             @if (Model.Songs.Count == 0)
             {
-                <div class="alert alert-warning">
+                <div class="mb-empty mb-4">
                     找不到歌曲——可能是 API 額度用完或網路問題,請稍後再試。
                 </div>
             }
 
-            <button type="submit" class="btn btn-primary btn-lg">儲存歌單</button>
+            <button type="submit" class="mb-btn">儲存歌單</button>
         </form>
     </div>
 </div>

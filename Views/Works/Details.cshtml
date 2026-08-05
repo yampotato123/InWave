@@ -2,50 +2,127 @@
 @{
     ViewData["Title"] = Model.Name;
     var songs = Model.PlaylistSongs.Select(ps => ps.Song).ToList();
-    var firstVideoId = songs.FirstOrDefault()?.YoutubeVideoId ?? "";
+    // 給底部播放列 JS 用的歌單資料
+    var songsJson = System.Text.Json.JsonSerializer.Serialize(
+        songs.Select(s => new { videoId = s.YoutubeVideoId, title = s.Title, artist = s.Artist, thumb = s.ThumbnailUrl }));
 }
 
-<div class="row g-4">
-    <div class="col-md-5">
+<div class="row g-4" style="padding-bottom: 96px">
+    <div class="col-lg-4">
         <img src="@(Model.Photo.EditedPath ?? Model.Photo.OriginalPath)"
-             class="img-fluid rounded shadow-sm" alt="作品照片" />
-        <h1 class="mt-3">@Model.Name</h1>
-        <p class="text-muted">
-            情緒:@(Model.Photo.Mood?.MoodName ?? "—")・建立於 @Model.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd")
+             class="img-fluid rounded-3" alt="作品照片" />
+        <h1 class="mb-section-title mt-3 mb-1">@Model.Name</h1>
+        <p class="mb-muted" style="font-size: 14px">
+            @(Model.Photo.Mood?.MoodName ?? "—")・@Model.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd")・@songs.Count 首
         </p>
     </div>
 
-    <div class="col-md-7">
-        <div class="ratio ratio-16x9 mb-3">
-            <iframe id="player" title="播放器" allowfullscreen
-                    allow="autoplay; encrypted-media"
-                    src="https://www.youtube.com/embed/@firstVideoId"></iframe>
+    <div class="col-lg-8">
+        <div class="mb-player ratio ratio-16x9 mb-3">
+            <div id="yt-player"></div>
         </div>
 
-        <ol class="list-group list-group-numbered">
-            @foreach (var song in songs)
+        <ul class="mb-song-list" id="song-list">
+            @for (var i = 0; i < songs.Count; i++)
             {
-                <li class="list-group-item d-flex align-items-center gap-3 play-item"
-                    style="cursor: pointer" data-video-id="@song.YoutubeVideoId">
-                    <img src="@song.ThumbnailUrl" width="64" class="rounded" alt="" />
-                    <div>
-                        <div>@song.Title</div>
-                        <small class="text-muted">@song.Artist</small>
+                <li class="mb-song-row playable @(i == 0 ? "active" : "")" data-index="@i">
+                    <span class="mb-muted" style="width: 20px; text-align: center; font-size: 14px">@(i + 1)</span>
+                    <img src="@songs[i].ThumbnailUrl" class="mb-song-thumb" alt="" />
+                    <div class="mb-song-main">
+                        <div class="mb-song-title">@songs[i].Title</div>
+                        <div class="mb-song-artist">@songs[i].Artist</div>
                     </div>
                 </li>
             }
-        </ol>
+        </ul>
+    </div>
+</div>
+
+@* 底部播放列:目前曲目 + 上一首/播放/下一首 *@
+<div class="mb-playerbar">
+    <div class="mb-playerbar-controls">
+        <button type="button" class="mb-iconbtn" id="btn-prev" aria-label="上一首">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M6 5h2v14H6zM20 5v14l-10-7z" />
+            </svg>
+        </button>
+        <button type="button" class="mb-iconbtn mb-iconbtn-lg" id="btn-play" aria-label="播放/暫停">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" id="icon-play">
+                <path d="M8 5v14l11-7z" />
+            </svg>
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" id="icon-pause" style="display:none">
+                <path d="M7 5h4v14H7zM13 5h4v14h-4z" />
+            </svg>
+        </button>
+        <button type="button" class="mb-iconbtn" id="btn-next" aria-label="下一首">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M16 5h2v14h-2zM4 5v14l10-7z" />
+            </svg>
+        </button>
+    </div>
+    <img src="" class="mb-now-thumb" id="now-thumb" alt="" />
+    <div class="mb-song-main">
+        <div class="mb-song-title" id="now-title"></div>
+        <div class="mb-song-artist" id="now-artist"></div>
     </div>
 </div>
 
 @section Scripts {
     <script>
-        // 點清單裡的歌切換播放器影片
-        document.querySelectorAll(".play-item").forEach(item => {
-            item.addEventListener("click", () => {
-                document.getElementById("player").src =
-                    `https://www.youtube.com/embed/${item.dataset.videoId}?autoplay=1`;
+        const songs = @Html.Raw(songsJson);
+        let player = null;
+        let current = 0;
+
+        // YouTube IFrame API:載入後會自動呼叫 onYouTubeIframeAPIReady
+        const tag = document.createElement("script");
+        tag.src = "https://www.youtube.com/iframe_api";
+        document.head.appendChild(tag);
+
+        window.onYouTubeIframeAPIReady = () => {
+            player = new YT.Player("yt-player", {
+                videoId: songs[0]?.videoId,
+                playerVars: { rel: 0 },
+                events: {
+                    onStateChange: e => {
+                        // 播完自動下一首;同步播放/暫停圖示
+                        if (e.data === YT.PlayerState.ENDED) playIndex(current + 1);
+                        setPlayingIcon(e.data === YT.PlayerState.PLAYING);
+                    },
+                },
             });
+        };
+
+        function setPlayingIcon(playing) {
+            document.getElementById("icon-play").style.display = playing ? "none" : "";
+            document.getElementById("icon-pause").style.display = playing ? "" : "none";
+        }
+
+        function updateBar() {
+            const s = songs[current];
+            if (!s) return;
+            document.getElementById("now-thumb").src = s.thumb;
+            document.getElementById("now-title").textContent = s.title;
+            document.getElementById("now-artist").textContent = s.artist;
+            document.querySelectorAll("#song-list .mb-song-row").forEach((row, i) =>
+                row.classList.toggle("active", i === current));
+        }
+
+        function playIndex(i) {
+            if (!player || songs.length === 0) return;
+            current = (i + songs.length) % songs.length; // 頭尾循環
+            player.loadVideoById(songs[current].videoId);
+            updateBar();
+        }
+
+        document.getElementById("btn-play").addEventListener("click", () => {
+            if (!player) return;
+            player.getPlayerState() === YT.PlayerState.PLAYING ? player.pauseVideo() : player.playVideo();
         });
+        document.getElementById("btn-prev").addEventListener("click", () => playIndex(current - 1));
+        document.getElementById("btn-next").addEventListener("click", () => playIndex(current + 1));
+        document.querySelectorAll("#song-list .mb-song-row").forEach(row =>
+            row.addEventListener("click", () => playIndex(Number(row.dataset.index))));
+
+        updateBar();
     </script>
 }

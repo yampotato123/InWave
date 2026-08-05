@@ -96,13 +96,14 @@ public class YouTubeService : IYouTubeService
     /// <summary>沒有 API key 時的示範資料(都是真實可播放的影片)。</summary>
     private static List<SongResult> MockResults() => new()
     {
-        new("jfKfPfyJRdk", "[示範] lofi hip hop radio - beats to relax/study to", "Lofi Girl",
-            "https://i.ytimg.com/vi/jfKfPfyJRdk/mqdefault.jpg"),
         new("kJQP7kiw5Fk", "[示範] Luis Fonsi - Despacito ft. Daddy Yankee", "Luis Fonsi",
             "https://i.ytimg.com/vi/kJQP7kiw5Fk/mqdefault.jpg"),
         new("9bZkp7q19f0", "[示範] PSY - GANGNAM STYLE", "officialpsy",
             "https://i.ytimg.com/vi/9bZkp7q19f0/mqdefault.jpg"),
         new("dQw4w9WgXcQ", "[示範] Rick Astley - Never Gonna Give You Up", "Rick Astley",
             "https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg"),
+        // 直播頻道嵌入播放常有限制,放最後
+        new("jfKfPfyJRdk", "[示範] lofi hip hop radio - beats to relax/study to", "Lofi Girl",
+            "https://i.ytimg.com/vi/jfKfPfyJRdk/mqdefault.jpg"),
     };
 }

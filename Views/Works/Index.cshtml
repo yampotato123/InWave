@@ -4,33 +4,27 @@
 }
 
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1>我的作品</h1>
-    <a asp-action="Create" class="btn btn-primary">建立新作品</a>
+    <h1 class="mb-page-title mb-0">我的作品</h1>
+    <a asp-action="Create" class="mb-btn">建立新作品</a>
 </div>
 
 @if (Model.Count == 0)
 {
-    <div class="alert alert-light border text-center py-5">
+    <div class="mb-empty">
         還沒有作品——<a asp-action="Create">建立第一個</a>吧!
     </div>
 }
 
-<div class="row row-cols-1 row-cols-md-3 g-4">
+<div class="mb-card-grid">
     @foreach (var playlist in Model)
     {
-        <div class="col">
-            <a asp-action="Details" asp-route-id="@playlist.Id" class="text-decoration-none">
-                <div class="card h-100 shadow-sm">
-                    <img src="@(playlist.Photo.EditedPath ?? playlist.Photo.OriginalPath)"
-                         class="card-img-top" style="height: 200px; object-fit: cover" alt="" />
-                    <div class="card-body">
-                        <h5 class="card-title text-body">@playlist.Name</h5>
-                        <p class="card-text text-muted small">
-                            @playlist.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd")
-                        </p>
-                    </div>
-                </div>
-            </a>
-        </div>
+        <a asp-action="Details" asp-route-id="@playlist.Id" class="mb-card">
+            <div class="mb-card-thumb">
+                <img src="@(playlist.Photo.EditedPath ?? playlist.Photo.OriginalPath)" alt="" />
+                <span class="mb-card-play"></span>
+            </div>
+            <div class="mb-card-title">@playlist.Name</div>
+            <div class="mb-card-sub">@playlist.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd")</div>
+        </a>
     }
 </div>

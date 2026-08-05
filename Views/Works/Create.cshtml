@@ -3,29 +3,31 @@
     ViewData["Title"] = "建立新作品";
 }
 
-<h1 class="mb-4">建立新作品</h1>
+<h1 class="mb-page-title">建立新作品</h1>
 
-<div asp-validation-summary="All" class="text-danger mb-3"></div>
+<div asp-validation-summary="All" class="mb-errors"></div>
 
-<form asp-action="Create" method="post" enctype="multipart/form-data" class="col-md-8">
+<form asp-action="Create" method="post" enctype="multipart/form-data" style="max-width: 640px">
     <div class="mb-4">
-        <label for="photoFile" class="form-label fw-bold">1. 選擇照片</label>
-        <input type="file" class="form-control" id="photoFile" name="photoFile"
-               accept=".jpg,.jpeg,.png,.webp" />
-        <div class="form-text">jpg / png / webp,10 MB 以內</div>
+        <div class="mb-muted mb-2">1. 選擇照片</div>
+        <div class="mb-file-drop">
+            <input type="file" class="form-control" id="photoFile" name="photoFile"
+                   accept=".jpg,.jpeg,.png,.webp" />
+            <div class="mb-muted mt-2" style="font-size: 13px">jpg / png / webp,10 MB 以內</div>
+        </div>
     </div>
 
     <div class="mb-4">
-        <label class="form-label fw-bold">2. 這張照片的情緒是?</label>
-        <div class="d-flex flex-wrap gap-2">
+        <div class="mb-muted mb-2">2. 這張照片的情緒是?</div>
+        <div class="mb-chips">
             @foreach (var mood in MoodKeywordMapper.AllMoods)
             {
                 <input type="radio" class="btn-check" name="moodName" id="mood-@mood"
                        value="@mood" autocomplete="off" />
-                <label class="btn btn-outline-primary" for="mood-@mood">@mood</label>
+                <label class="mb-chip" for="mood-@mood">@mood</label>
             }
         </div>
     </div>
 
-    <button type="submit" class="btn btn-primary btn-lg">產生推薦歌單</button>
+    <button type="submit" class="mb-btn">產生推薦歌單</button>
 </form>
