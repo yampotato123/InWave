@@ -42,6 +42,19 @@ Views/Works/       Create(上傳+選情緒)→ Recommend(推薦+勾選)→ Detai
 wwwroot/uploads/   使用者上傳的照片(不進 git)
 ```
 
+## 前端版面
+
+介面對齊 YouTube Music 的暗色風格,樣式全部在 `wwwroot/css/site.css`
+(檔頭有色票說明:背景 #030303、面板 #1C1C1C、品牌紅 #FF0033 只用在 logo 與播放中狀態):
+
+- 左側欄 + 主內容的版面骨架在 `Views/Shared/_Layout.cshtml`
+- 情緒選擇 = YT 的濾鏡 chips(`.mb-chip`,radio + label,不用 JS)
+- 作品牆 = 圓角縮圖卡片(`.mb-card`,懸停浮出播放鈕)
+- 歌曲列 = `.mb-song-row`(56px 縮圖 + 標題/來源)
+- **作品頁底部播放列**:`Views/Works/Details.cshtml` 的 script 區塊,
+  用 YouTube IFrame API 控制播放/暫停/上下首、播完自動接下一首。
+  這是骨架裡最需要先讀懂的 50 行 JS——demo 一定會被問到播放怎麼做的。
+
 ## 已完成的垂直切片
 
 上傳照片 → 選 8 種情緒之一 → 情緒轉搜尋關鍵字(`MoodKeywordMapper`)→
