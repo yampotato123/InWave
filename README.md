@@ -88,5 +88,8 @@ dotnet ef database update
 - **`dotnet ef` 說找不到指令** → `dotnet tool install --global dotnet-ef`
 - **LocalDB 連不上** → `sqllocaldb start MSSQLLocalDB`,VS 沒裝完整的話用
   VS Installer 補「資料儲存與處理」工作負載
-- **搜尋一直回 [示範] 資料** → API key 沒設定,見上面 user-secrets 指令
+- **搜尋一直回 [示範] 資料** → API key 沒設定,見上面 user-secrets 指令;
+  設了還是 [示範] 的話,確認是以 Development 環境執行(user-secrets 只在
+  Development 載入;VS 或一般 `dotnet run` 預設就是,只有 `--no-launch-profile`
+  之類的跑法要自己設 `ASPNETCORE_ENVIRONMENT=Development`)
 - **搜尋回空清單** → 看主控台 log:配額用完(quotaExceeded)或網路問題
