@@ -1,0 +1,78 @@
+@model MyMusicBuddy.Models.ViewModels.RecommendViewModel
+@{
+    ViewData["Title"] = "推薦歌單";
+}
+
+<h1 class="mb-4">為你的「@Model.MoodName」推薦</h1>
+
+<div class="row g-4">
+    <div class="col-md-4">
+        <img src="@Model.PhotoPath" class="img-fluid rounded shadow-sm" alt="作品照片" />
+        <p class="text-muted mt-2 small">搜尋關鍵字:@Model.SearchKeyword</p>
+
+        @* 試聽用播放器:按歌曲旁的「試聽」會把影片載入這裡 *@
+        <div class="ratio ratio-16x9 mt-3">
+            <iframe id="preview-player" src="" title="試聽" allowfullscreen
+                    allow="autoplay; encrypted-media"></iframe>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        <div asp-validation-summary="All" class="text-danger mb-3"></div>
+
+        <form asp-action="SavePlaylist" method="post">
+            <input type="hidden" asp-for="PhotoId" />
+            <input type="hidden" asp-for="PhotoPath" />
+            <input type="hidden" asp-for="MoodName" />
+            <input type="hidden" asp-for="SearchKeyword" />
+
+            <div class="mb-3">
+                <label asp-for="PlaylistName" class="form-label fw-bold">歌單名稱</label>
+                <input asp-for="PlaylistName" class="form-control" />
+            </div>
+
+            <ul class="list-group mb-3">
+                @for (var i = 0; i < Model.Songs.Count; i++)
+                {
+                    <li class="list-group-item d-flex align-items-center gap-3">
+                        <input type="hidden" asp-for="Songs[i].VideoId" />
+                        <input type="hidden" asp-for="Songs[i].Title" />
+                        <input type="hidden" asp-for="Songs[i].Artist" />
+                        <input type="hidden" asp-for="Songs[i].ThumbnailUrl" />
+
+                        <input class="form-check-input mt-0" type="checkbox" asp-for="Songs[i].Selected" />
+                        <img src="@Model.Songs[i].ThumbnailUrl" width="80" class="rounded" alt="" />
+                        <div class="flex-grow-1">
+                            <div>@Model.Songs[i].Title</div>
+                            <small class="text-muted">@Model.Songs[i].Artist</small>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-secondary preview-btn"
+                                data-video-id="@Model.Songs[i].VideoId">試聽</button>
+                    </li>
+                }
+            </ul>
+
+            @if (Model.Songs.Count == 0)
+            {
+                <div class="alert alert-warning">
+                    找不到歌曲——可能是 API 額度用完或網路問題,請稍後再試。
+                </div>
+            }
+
+            <button type="submit" class="btn btn-primary btn-lg">儲存歌單</button>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // 點「試聽」把該影片載入左側播放器
+        document.querySelectorAll(".preview-btn").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const id = btn.dataset.videoId;
+                document.getElementById("preview-player").src =
+                    `https://www.youtube.com/embed/${id}?autoplay=1`;
+            });
+        });
+    </script>
+}

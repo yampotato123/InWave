@@ -1,0 +1,51 @@
+@model MyMusicBuddy.Models.Playlist
+@{
+    ViewData["Title"] = Model.Name;
+    var songs = Model.PlaylistSongs.Select(ps => ps.Song).ToList();
+    var firstVideoId = songs.FirstOrDefault()?.YoutubeVideoId ?? "";
+}
+
+<div class="row g-4">
+    <div class="col-md-5">
+        <img src="@(Model.Photo.EditedPath ?? Model.Photo.OriginalPath)"
+             class="img-fluid rounded shadow-sm" alt="作品照片" />
+        <h1 class="mt-3">@Model.Name</h1>
+        <p class="text-muted">
+            情緒:@(Model.Photo.Mood?.MoodName ?? "—")・建立於 @Model.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd")
+        </p>
+    </div>
+
+    <div class="col-md-7">
+        <div class="ratio ratio-16x9 mb-3">
+            <iframe id="player" title="播放器" allowfullscreen
+                    allow="autoplay; encrypted-media"
+                    src="https://www.youtube.com/embed/@firstVideoId"></iframe>
+        </div>
+
+        <ol class="list-group list-group-numbered">
+            @foreach (var song in songs)
+            {
+                <li class="list-group-item d-flex align-items-center gap-3 play-item"
+                    style="cursor: pointer" data-video-id="@song.YoutubeVideoId">
+                    <img src="@song.ThumbnailUrl" width="64" class="rounded" alt="" />
+                    <div>
+                        <div>@song.Title</div>
+                        <small class="text-muted">@song.Artist</small>
+                    </div>
+                </li>
+            }
+        </ol>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // 點清單裡的歌切換播放器影片
+        document.querySelectorAll(".play-item").forEach(item => {
+            item.addEventListener("click", () => {
+                document.getElementById("player").src =
+                    `https://www.youtube.com/embed/${item.dataset.videoId}?autoplay=1`;
+            });
+        });
+    </script>
+}

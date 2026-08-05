@@ -1,0 +1,12 @@
+@{
+    ViewData["Title"] = "首頁";
+}
+
+<div class="text-center py-5">
+    <h1 class="display-4">MyMusicBuddy</h1>
+    <p class="lead text-muted">一張照片,一種情緒,一份可以播放、調整與分享的歌單。</p>
+    <div class="d-flex gap-3 justify-content-center mt-4">
+        <a asp-controller="Works" asp-action="Create" class="btn btn-primary btn-lg">建立新作品</a>
+        <a asp-controller="Works" asp-action="Index" class="btn btn-outline-secondary btn-lg">我的作品</a>
+    </div>
+</div>
