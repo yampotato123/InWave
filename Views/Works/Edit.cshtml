@@ -1,0 +1,138 @@
+@using MyMusicBuddy.Services
+@model MyMusicBuddy.Models.ViewModels.EditViewModel
+@{
+    ViewData["Title"] = "修圖";
+}
+
+<h1 class="mb-page-title">修圖</h1>
+<p class="mb-muted">情緒已選「@Model.MoodName」。濾鏡除了改變照片外觀,也會影響推薦的音樂。</p>
+
+<div asp-validation-summary="All" class="mb-errors"></div>
+
+<form asp-action="Edit" method="post" id="edit-form">
+    <input type="hidden" asp-for="PhotoId" />
+    <input type="hidden" asp-for="EditedImage" id="EditedImage" />
+
+    <div class="row g-4">
+        <div class="col-lg-7">
+            <div class="mb-canvas-wrap">
+                <canvas id="preview"></canvas>
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="mb-4">
+                <div class="mb-muted mb-2">1. 調整</div>
+
+                <label class="mb-slider-row">
+                    <span class="mb-slider-label">亮度</span>
+                    <input type="range" class="mb-slider" asp-for="Brightness" min="0" max="200" step="1" />
+                    <output class="mb-slider-value">@Model.Brightness</output>
+                </label>
+
+                <label class="mb-slider-row">
+                    <span class="mb-slider-label">對比</span>
+                    <input type="range" class="mb-slider" asp-for="Contrast" min="0" max="200" step="1" />
+                    <output class="mb-slider-value">@Model.Contrast</output>
+                </label>
+
+                <label class="mb-slider-row">
+                    <span class="mb-slider-label">飽和度</span>
+                    <input type="range" class="mb-slider" asp-for="Saturation" min="0" max="200" step="1" />
+                    <output class="mb-slider-value">@Model.Saturation</output>
+                </label>
+
+                <button type="button" class="mb-btn mb-btn-outline mb-btn-sm" id="reset-btn">重設為原圖</button>
+            </div>
+
+            <div class="mb-4">
+                <div class="mb-muted mb-2">2. 濾鏡</div>
+                <div class="mb-chips">
+                    <input type="radio" class="btn-check" name="FilterName" id="filter-none"
+                           value="" data-css="" autocomplete="off"
+                           checked="@(PhotoFilters.Find(Model.FilterName) == null)" />
+                    <label class="mb-chip" for="filter-none">無</label>
+
+                    @foreach (var filter in PhotoFilters.All)
+                    {
+                        <input type="radio" class="btn-check" name="FilterName" id="filter-@filter.Name"
+                               value="@filter.Name" data-css="@filter.CssFilter"
+                               data-modifier="@filter.KeywordModifier" autocomplete="off"
+                               checked="@(Model.FilterName == filter.Name)" />
+                        <label class="mb-chip" for="filter-@filter.Name">@filter.Name</label>
+                    }
+                </div>
+                <div class="mb-muted mt-2" style="font-size: 13px">
+                    搜尋關鍵字會變成:<span id="keyword-preview"></span>
+                </div>
+            </div>
+
+            <button type="submit" class="mb-btn">套用並產生歌單</button>
+            <a class="mb-btn mb-btn-outline" asp-action="Recommend" asp-route-photoId="@Model.PhotoId">略過修圖</a>
+        </div>
+    </div>
+</form>
+
+@section Scripts {
+    <script>
+        // 長邊超過這個像素就縮圖再匯出,避免 data URL 撐爆表單欄位上限
+        const MAX_EDGE = 1600;
+
+        const canvas = document.getElementById("preview");
+        const ctx = canvas.getContext("2d");
+        const editedField = document.getElementById("EditedImage");
+        const sliders = ["Brightness", "Contrast", "Saturation"]
+            .map(id => document.getElementById(id));
+        const filterInputs = document.querySelectorAll("input[name='FilterName']");
+        const baseKeyword = @Html.Raw(Json.Serialize(MoodKeywordMapper.GetKeyword(Model.MoodName)));
+
+        function checkedFilter() {
+            return document.querySelector("input[name='FilterName']:checked");
+        }
+
+        // CSS filter 的同名函式是「連乘」的,所以濾鏡預設會疊在滑桿之上。
+        // 例:滑桿 brightness(1.2) 再加暖陽的 brightness(1.05) = 實際 1.26。這是預期行為。
+        function redraw() {
+            const [b, c, s] = sliders.map(el => Number(el.value) / 100);
+            const preset = checkedFilter()?.dataset.css ?? "";
+            ctx.filter = `brightness(${b}) contrast(${c}) saturate(${s}) ${preset}`.trim();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        }
+
+        function syncLabels() {
+            sliders.forEach(el => {
+                el.closest(".mb-slider-row").querySelector(".mb-slider-value").textContent = el.value;
+            });
+            const modifier = checkedFilter()?.dataset.modifier;
+            document.getElementById("keyword-preview").textContent =
+                modifier ? `${baseKeyword} ${modifier}` : baseKeyword;
+        }
+
+        const img = new Image();
+        img.onload = () => {
+            const scale = Math.min(1, MAX_EDGE / Math.max(img.naturalWidth, img.naturalHeight));
+            canvas.width = Math.round(img.naturalWidth * scale);
+            canvas.height = Math.round(img.naturalHeight * scale);
+            redraw();
+        };
+        img.src = @Html.Raw(Json.Serialize(Model.PhotoPath));
+
+        sliders.forEach(el => el.addEventListener("input", () => { redraw(); syncLabels(); }));
+        filterInputs.forEach(el => el.addEventListener("change", () => { redraw(); syncLabels(); }));
+
+        document.getElementById("reset-btn").addEventListener("click", () => {
+            sliders.forEach(el => el.value = 100);
+            document.getElementById("filter-none").checked = true;
+            redraw();
+            syncLabels();
+        });
+
+        // 送出前把 canvas 的內容轉成 data URL 塞進隱藏欄位
+        document.getElementById("edit-form").addEventListener("submit", () => {
+            editedField.value = canvas.toDataURL("image/jpeg", 0.85);
+        });
+
+        syncLabels();
+    </script>
+}

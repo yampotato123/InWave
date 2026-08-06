@@ -10,7 +10,10 @@ public class PhotoEdit
     public int Contrast { get; set; } = 100;
     public int Saturation { get; set; } = 100;
 
-    /// <summary>套用的情緒濾鏡名稱(夜色、午後、溫暖…);未套用為 null</summary>
+    /// <summary>
+    /// 套用的濾鏡名稱,取值見 Services/PhotoFilters.All(暖陽、冷夜、褪色);未套用為 null。
+    /// 注意這與 MoodProfile.MoodName 是不同的東西:情緒在 Create 選,濾鏡在 Edit 選。
+    /// </summary>
     public string? FilterName { get; set; }
 
     public Photo Photo { get; set; } = null!;

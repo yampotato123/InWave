@@ -21,6 +21,16 @@ public static class MoodKeywordMapper
         ["慶祝"] = "party celebration songs",
     };
 
-    public static string GetKeyword(string moodName) =>
-        Keywords.TryGetValue(moodName, out var keyword) ? keyword : "chill music";
+    /// <summary>
+    /// 情緒(必要)加濾鏡(選填)轉成搜尋關鍵字。
+    /// 濾鏡的修飾詞直接接在情緒關鍵字後面,例:「午後」+「冷夜」
+    /// → "warm lo-fi afternoon music night"。
+    /// 認不得的情緒退回 "chill music";認不得或沒選的濾鏡就不加修飾詞。
+    /// </summary>
+    public static string GetKeyword(string moodName, string? filterName = null)
+    {
+        var keyword = Keywords.TryGetValue(moodName, out var found) ? found : "chill music";
+        var modifier = PhotoFilters.Find(filterName)?.KeywordModifier;
+        return modifier == null ? keyword : $"{keyword} {modifier}";
+    }
 }

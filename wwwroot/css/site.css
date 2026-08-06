@@ -402,6 +402,74 @@ body {
 .mb-song-row.active { background: var(--mb-surface); }
 .mb-song-row.active .mb-song-title { color: var(--mb-red); }
 
+/* ---------- 修圖頁:canvas 預覽與滑桿 ---------- */
+
+.mb-canvas-wrap {
+  background: var(--mb-surface);
+  border: 1px solid var(--mb-border);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+/* canvas 的 width/height 屬性是實際像素,這裡只管顯示尺寸 */
+.mb-canvas-wrap canvas {
+  max-width: 100%;
+  max-height: 60vh;
+  height: auto;
+  border-radius: 8px;
+}
+
+.mb-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  cursor: pointer;
+}
+.mb-slider-label {
+  width: 48px;
+  flex-shrink: 0;
+  font-size: 14px;
+  color: var(--mb-muted);
+}
+.mb-slider-value {
+  width: 34px;
+  flex-shrink: 0;
+  text-align: right;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--mb-muted);
+}
+
+.mb-slider {
+  flex: 1;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--mb-border);
+  cursor: pointer;
+}
+.mb-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  border: none;
+  cursor: pointer;
+}
+.mb-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  border: none;
+  cursor: pointer;
+}
+.mb-slider:focus-visible { outline: 2px solid var(--mb-red); outline-offset: 4px; }
+
 @media (prefers-reduced-motion: reduce) {
   .mb-card-thumb::after, .mb-card-play { transition: none; }
 }

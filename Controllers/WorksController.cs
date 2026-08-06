@@ -16,6 +16,11 @@ public class WorksController : Controller
     private static readonly string[] AllowedExtensions = { ".jpg", ".jpeg", ".png", ".webp" };
     private const long MaxPhotoBytes = 10 * 1024 * 1024; // 10 MB
 
+    // 合成圖以 data URL 走一般表單欄位送上來。ASP.NET Core 的表單欄位預設上限是 4 MB,
+    // 這裡卡在略低的位置,讓使用者看到明確訊息而不是伺服器層的 400。
+    private const int MaxEditedDataUrlChars = 4_000_000;
+    private const string JpegDataUrlPrefix = "data:image/jpeg;base64,";
+
     private readonly AppDbContext _db;
     private readonly IYouTubeService _youtube;
     private readonly IWebHostEnvironment _env;
@@ -81,7 +86,102 @@ public class WorksController : Controller
         _db.Photos.Add(photo);
         await _db.SaveChangesAsync();
 
+        return RedirectToAction(nameof(Edit), new { id = photo.Id });
+    }
+
+    // GET /Works/Edit/5 — canvas 修圖:3 個滑桿 + 3 種濾鏡
+    [HttpGet]
+    public async Task<IActionResult> Edit(int id)
+    {
+        var photo = await _db.Photos
+            .Include(p => p.Edit)
+            .Include(p => p.Mood)
+            .FirstOrDefaultAsync(p => p.Id == id);
+        if (photo == null)
+            return NotFound();
+
+        var edit = photo.Edit ?? new PhotoEdit();
+        return View(new EditViewModel
+        {
+            PhotoId = photo.Id,
+            PhotoPath = photo.OriginalPath,
+            MoodName = photo.Mood?.MoodName ?? "",
+            Brightness = edit.Brightness,
+            Contrast = edit.Contrast,
+            Saturation = edit.Saturation,
+            FilterName = edit.FilterName,
+        });
+    }
+
+    // POST /Works/Edit — 存修圖參數與 canvas 合成後的圖
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Edit(EditViewModel vm)
+    {
+        var photo = await _db.Photos
+            .Include(p => p.Edit)
+            .FirstOrDefaultAsync(p => p.Id == vm.PhotoId);
+        if (photo == null)
+            return NotFound();
+
+        // 「不套濾鏡」的 radio 送上來是空字串,統一收斂成 null
+        var filterName = string.IsNullOrEmpty(vm.FilterName) ? null : vm.FilterName;
+
+        if (!PhotoFilters.IsValid(filterName))
+            ModelState.AddModelError("", "選到不存在的濾鏡,請重新選擇。");
+
+        if (string.IsNullOrEmpty(vm.EditedImage))
+            ModelState.AddModelError("", "瀏覽器沒有產生預覽圖,請確認 JavaScript 已啟用。");
+        else if (vm.EditedImage.Length > MaxEditedDataUrlChars)
+            ModelState.AddModelError("", "修圖後的圖片太大,請換一張尺寸小一點的照片。");
+
+        var bytes = ModelState.IsValid ? DecodeJpegDataUrl(vm.EditedImage!) : null;
+        if (ModelState.IsValid && bytes == null)
+            ModelState.AddModelError("", "預覽圖格式不正確,請重新整理後再試一次。");
+
+        if (!ModelState.IsValid)
+        {
+            // 重新顯示時 canvas 要重載原圖,PhotoPath 不從表單帶(避免被竄改)
+            vm.PhotoPath = photo.OriginalPath;
+            return View(vm);
+        }
+
+        // 合成圖檔名由原檔推導,重修就原地覆蓋,不會累積孤兒檔
+        var editedName = Path.GetFileNameWithoutExtension(photo.OriginalPath) + "_edited.jpg";
+        var uploadDir = Path.Combine(_env.WebRootPath, "uploads");
+        Directory.CreateDirectory(uploadDir);
+        await System.IO.File.WriteAllBytesAsync(Path.Combine(uploadDir, editedName), bytes!);
+
+        var edit = photo.Edit;
+        if (edit == null)
+        {
+            edit = new PhotoEdit { PhotoId = photo.Id };
+            _db.PhotoEdits.Add(edit);
+        }
+        edit.Brightness = Math.Clamp(vm.Brightness, 0, 200);
+        edit.Contrast = Math.Clamp(vm.Contrast, 0, 200);
+        edit.Saturation = Math.Clamp(vm.Saturation, 0, 200);
+        edit.FilterName = filterName;
+
+        photo.EditedPath = "/uploads/" + editedName;
+        await _db.SaveChangesAsync();
+
         return RedirectToAction(nameof(Recommend), new { photoId = photo.Id });
+    }
+
+    /// <summary>解出 data URL 裡的 JPEG 位元組;前綴不對或 base64 壞掉回 null。</summary>
+    private static byte[]? DecodeJpegDataUrl(string dataUrl)
+    {
+        if (!dataUrl.StartsWith(JpegDataUrlPrefix, StringComparison.Ordinal))
+            return null;
+        try
+        {
+            return Convert.FromBase64String(dataUrl[JpegDataUrlPrefix.Length..]);
+        }
+        catch (FormatException)
+        {
+            return null;
+        }
     }
 
     // GET /Works/Recommend?photoId=1 — 顯示推薦歌曲
@@ -90,11 +190,12 @@ public class WorksController : Controller
     {
         var photo = await _db.Photos
             .Include(p => p.Mood)
+            .Include(p => p.Edit)   // 濾鏡要參與關鍵字;少了這行 photo.Edit 是 null,濾鏡會安靜失效
             .FirstOrDefaultAsync(p => p.Id == photoId);
         if (photo?.Mood == null)
             return NotFound();
 
-        var keyword = MoodKeywordMapper.GetKeyword(photo.Mood.MoodName);
+        var keyword = MoodKeywordMapper.GetKeyword(photo.Mood.MoodName, photo.Edit?.FilterName);
         var results = await _youtube.SearchAsync(keyword);
 
         var vm = new RecommendViewModel
