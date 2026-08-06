@@ -15,11 +15,11 @@ namespace MyMusicBuddy.Migrations
                 name: "Photos",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    OriginalPath = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    EditedPath = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    OriginalPath = table.Column<string>(type: "TEXT", nullable: false),
+                    EditedPath = table.Column<string>(type: "TEXT", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -30,11 +30,11 @@ namespace MyMusicBuddy.Migrations
                 name: "SearchCaches",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    Query = table.Column<string>(type: "nvarchar(450)", nullable: false),
-                    JsonResult = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    FetchedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    Query = table.Column<string>(type: "TEXT", nullable: false),
+                    JsonResult = table.Column<string>(type: "TEXT", nullable: false),
+                    FetchedAt = table.Column<DateTime>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -45,12 +45,12 @@ namespace MyMusicBuddy.Migrations
                 name: "Songs",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    YoutubeVideoId = table.Column<string>(type: "nvarchar(450)", nullable: false),
-                    Title = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Artist = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    ThumbnailUrl = table.Column<string>(type: "nvarchar(max)", nullable: false)
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    YoutubeVideoId = table.Column<string>(type: "TEXT", nullable: false),
+                    Title = table.Column<string>(type: "TEXT", nullable: false),
+                    Artist = table.Column<string>(type: "TEXT", nullable: false),
+                    ThumbnailUrl = table.Column<string>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -61,14 +61,14 @@ namespace MyMusicBuddy.Migrations
                 name: "MoodProfiles",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    PhotoId = table.Column<int>(type: "int", nullable: false),
-                    MoodName = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Energy = table.Column<int>(type: "int", nullable: false),
-                    Calmness = table.Column<int>(type: "int", nullable: false),
-                    Warmth = table.Column<int>(type: "int", nullable: false),
-                    Exploration = table.Column<int>(type: "int", nullable: false)
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    PhotoId = table.Column<int>(type: "INTEGER", nullable: false),
+                    MoodName = table.Column<string>(type: "TEXT", nullable: false),
+                    Energy = table.Column<int>(type: "INTEGER", nullable: false),
+                    Calmness = table.Column<int>(type: "INTEGER", nullable: false),
+                    Warmth = table.Column<int>(type: "INTEGER", nullable: false),
+                    Exploration = table.Column<int>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -85,13 +85,13 @@ namespace MyMusicBuddy.Migrations
                 name: "PhotoEdits",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    PhotoId = table.Column<int>(type: "int", nullable: false),
-                    Brightness = table.Column<int>(type: "int", nullable: false),
-                    Contrast = table.Column<int>(type: "int", nullable: false),
-                    Saturation = table.Column<int>(type: "int", nullable: false),
-                    FilterName = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    PhotoId = table.Column<int>(type: "INTEGER", nullable: false),
+                    Brightness = table.Column<int>(type: "INTEGER", nullable: false),
+                    Contrast = table.Column<int>(type: "INTEGER", nullable: false),
+                    Saturation = table.Column<int>(type: "INTEGER", nullable: false),
+                    FilterName = table.Column<string>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -108,11 +108,11 @@ namespace MyMusicBuddy.Migrations
                 name: "Playlists",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    Name = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    PhotoId = table.Column<int>(type: "int", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    Name = table.Column<string>(type: "TEXT", nullable: false),
+                    PhotoId = table.Column<int>(type: "INTEGER", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -129,11 +129,11 @@ namespace MyMusicBuddy.Migrations
                 name: "PlaylistSongs",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    PlaylistId = table.Column<int>(type: "int", nullable: false),
-                    SongId = table.Column<int>(type: "int", nullable: false),
-                    SortOrder = table.Column<int>(type: "int", nullable: false)
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    PlaylistId = table.Column<int>(type: "INTEGER", nullable: false),
+                    SongId = table.Column<int>(type: "INTEGER", nullable: false),
+                    SortOrder = table.Column<int>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {

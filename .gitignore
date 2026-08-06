@@ -484,3 +484,8 @@ $RECYCLE.BIN/
 # 使用者上傳的照片不進版控
 wwwroot/uploads/*
 !wwwroot/uploads/.gitkeep
+
+# SQLite 資料庫檔案(含 WAL 模式的伴生檔)不進版控
+*.db
+*.db-shm
+*.db-wal

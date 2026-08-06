@@ -8,7 +8,17 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.10" />
+    <!-- Web SDK 預設遞迴收錄所有 .cs,不排除的話測試專案會被主專案一起編譯 -->
+    <Compile Remove="MyMusicBuddy.Tests/**" />
+    <Content Remove="MyMusicBuddy.Tests/**" />
+    <None Remove="MyMusicBuddy.Tests/**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.10" />
+    <!-- EF Core 10.0.10 傳遞相依的 SQLitePCLRaw 2.1.11 內含 SQLite < 3.50.2,
+         有 CVE-2025-6965(聚合函式記憶體損毀,CVSS 7.2)。明確指定 2.1.12 覆寫它。 -->
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.12" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.10">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
