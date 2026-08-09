@@ -1,23 +1,29 @@
 @model MyMusicBuddy.Models.ViewModels.RecommendViewModel
 @{
     ViewData["Title"] = "推薦歌單";
+    ViewData["Backdrop"] = Model.PhotoPath;
 }
 
-<h1 class="mb-page-title">為你的「@Model.MoodName」推薦</h1>
+<div class="row g-5">
+    <div class="col-lg-5">
+        <img src="@Model.PhotoPath" data-accent-src alt="作品照片"
+             style="width: 100%; border-radius: 14px; display: block; box-shadow: 0 18px 48px rgba(0,0,0,.5)" />
 
-<div class="row g-4">
-    <div class="col-lg-4">
-        <img src="@Model.PhotoPath" class="img-fluid rounded-3" alt="作品照片" />
-        <p class="mb-muted mt-2" style="font-size: 13px">搜尋關鍵字:@Model.SearchKeyword</p>
+        <div class="mb-mood-rule"></div>
+        <div class="mb-mood">@Model.MoodName</div>
+        <p class="mb-muted" style="font-size: 13px; margin-top: 18px; line-height: 1.7">
+            搜尋關鍵字<br />
+            <span style="color: var(--mb-accent)">@Model.SearchKeyword</span>
+        </p>
 
         @* 試聽用播放器:按歌曲列的「試聽」會把影片載入這裡 *@
-        <div class="mb-player ratio ratio-16x9 mt-2">
+        <div class="mb-player ratio ratio-16x9" style="margin-top: 18px">
             <iframe id="preview-player" src="" title="試聽" allowfullscreen
                     allow="autoplay; encrypted-media"></iframe>
         </div>
     </div>
 
-    <div class="col-lg-8">
+    <div class="col-lg-7">
         <div asp-validation-summary="All" class="mb-errors"></div>
 
         <form asp-action="SavePlaylist" method="post">
@@ -26,11 +32,14 @@
             <input type="hidden" asp-for="MoodName" />
             <input type="hidden" asp-for="SearchKeyword" />
 
-            <div class="mb-4">
-                <input asp-for="PlaylistName" class="mb-input" placeholder="歌單名稱" />
+            <div class="mb-eyebrow" style="margin-bottom: 10px">歌單名稱</div>
+            <input asp-for="PlaylistName" class="mb-input" placeholder="幫這份歌單取個名字" />
+
+            <div class="mb-eyebrow" style="margin: 32px 0 10px">
+                勾選要收進歌單的歌　（@Model.Songs.Count 首）
             </div>
 
-            <ul class="mb-song-list mb-4">
+            <ul class="mb-song-list">
                 @for (var i = 0; i < Model.Songs.Count; i++)
                 {
                     <li class="mb-song-row">
@@ -54,12 +63,12 @@
 
             @if (Model.Songs.Count == 0)
             {
-                <div class="mb-empty mb-4">
+                <div class="mb-empty">
                     找不到歌曲——可能是 API 額度用完或網路問題,請稍後再試。
                 </div>
             }
 
-            <button type="submit" class="mb-btn">儲存歌單</button>
+            <button type="submit" class="mb-btn" style="margin-top: 28px">儲存歌單</button>
         </form>
     </div>
 </div>

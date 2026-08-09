@@ -2,10 +2,20 @@
 @model MyMusicBuddy.Models.ViewModels.EditViewModel
 @{
     ViewData["Title"] = "修圖";
+    ViewData["Backdrop"] = Model.PhotoPath;
 }
 
-<h1 class="mb-page-title">修圖</h1>
-<p class="mb-muted">情緒已選「@Model.MoodName」。濾鏡除了改變照片外觀,也會影響推薦的音樂。</p>
+@* 只為了取樣主色而載入的圖:canvas 是用 JS 建的 Image,accent.js 掃不到 *@
+<img src="@Model.PhotoPath" alt="" aria-hidden="true" data-accent-src
+     style="position:absolute; width:1px; height:1px; opacity:0; pointer-events:none" />
+
+<div style="display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap">
+    <h1 class="mb-page-title" style="margin-bottom: 4px">修圖</h1>
+    <span class="mb-muted" style="font-size: 15px">情緒已選「@Model.MoodName」</span>
+</div>
+<p class="mb-muted" style="font-size: 14px; margin-bottom: 28px">
+    濾鏡除了改變照片外觀,也會影響推薦的音樂。
+</p>
 
 <div asp-validation-summary="All" class="mb-errors"></div>
 
@@ -21,8 +31,8 @@
         </div>
 
         <div class="col-lg-5">
-            <div class="mb-4">
-                <div class="mb-muted mb-2">1. 調整</div>
+            <div class="mb-panel">
+                <div class="mb-eyebrow" style="margin-bottom: 18px">1 — 調整</div>
 
                 <label class="mb-slider-row">
                     <span class="mb-slider-label">亮度</span>
@@ -43,10 +53,8 @@
                 </label>
 
                 <button type="button" class="mb-btn mb-btn-outline mb-btn-sm" id="reset-btn">重設為原圖</button>
-            </div>
 
-            <div class="mb-4">
-                <div class="mb-muted mb-2">2. 濾鏡</div>
+                <div class="mb-eyebrow" style="margin: 28px 0 12px">2 — 濾鏡</div>
                 <div class="mb-chips">
                     <input type="radio" class="btn-check" name="FilterName" id="filter-none"
                            value="" data-css="" autocomplete="off"
@@ -62,13 +70,15 @@
                         <label class="mb-chip" for="filter-@filter.Name">@filter.Name</label>
                     }
                 </div>
-                <div class="mb-muted mt-2" style="font-size: 13px">
-                    搜尋關鍵字會變成:<span id="keyword-preview"></span>
+                <div class="mb-muted" style="font-size: 12.5px; margin-top: 14px; line-height: 1.6">
+                    搜尋關鍵字會變成<br /><span id="keyword-preview" style="color: var(--mb-accent)"></span>
                 </div>
             </div>
 
-            <button type="submit" class="mb-btn">套用並產生歌單</button>
-            <a class="mb-btn mb-btn-outline" asp-action="Recommend" asp-route-photoId="@Model.PhotoId">略過修圖</a>
+            <div class="d-flex gap-3" style="margin-top: 20px">
+                <button type="submit" class="mb-btn">套用並產生歌單</button>
+                <a class="mb-btn mb-btn-outline" asp-action="Recommend" asp-route-photoId="@Model.PhotoId">略過修圖</a>
+            </div>
         </div>
     </div>
 </form>

@@ -1,24 +1,30 @@
 @model MyMusicBuddy.Models.Playlist
 @{
     ViewData["Title"] = Model.Name;
+    var photoPath = Model.Photo.EditedPath ?? Model.Photo.OriginalPath;
+    ViewData["Backdrop"] = photoPath;
     var songs = Model.PlaylistSongs.Select(ps => ps.Song).ToList();
     // 給底部播放列 JS 用的歌單資料
     var songsJson = System.Text.Json.JsonSerializer.Serialize(
         songs.Select(s => new { videoId = s.YoutubeVideoId, title = s.Title, artist = s.Artist, thumb = s.ThumbnailUrl }));
 }
 
-<div class="row g-4" style="padding-bottom: 96px">
-    <div class="col-lg-4">
-        <img src="@(Model.Photo.EditedPath ?? Model.Photo.OriginalPath)"
-             class="img-fluid rounded-3" alt="作品照片" />
-        <h1 class="mb-section-title mt-3 mb-1">@Model.Name</h1>
-        <p class="mb-muted" style="font-size: 14px">
-            @(Model.Photo.Mood?.MoodName ?? "—")・@Model.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd")・@songs.Count 首
+<div class="row g-5" style="padding-bottom: 110px">
+    <div class="col-lg-5">
+        <img src="@photoPath" data-accent-src alt="作品照片"
+             style="width: 100%; border-radius: 14px; display: block; box-shadow: 0 20px 56px rgba(0,0,0,.55)" />
+
+        <div class="mb-mood-rule"></div>
+        <div class="mb-mood">@(Model.Photo.Mood?.MoodName ?? "—")</div>
+
+        <h1 class="mb-section-title" style="margin-top: 22px">@Model.Name</h1>
+        <p class="mb-muted" style="font-size: 13.5px; margin-top: 6px">
+            @Model.CreatedAt.ToLocalTime().ToString("yyyy 年 M 月 d 日")　・　@songs.Count 首
         </p>
     </div>
 
-    <div class="col-lg-8">
-        <div class="mb-player ratio ratio-16x9 mb-3">
+    <div class="col-lg-7">
+        <div class="mb-player ratio ratio-16x9" style="margin-bottom: 22px">
             <div id="yt-player"></div>
         </div>
 
@@ -26,7 +32,7 @@
             @for (var i = 0; i < songs.Count; i++)
             {
                 <li class="mb-song-row playable @(i == 0 ? "active" : "")" data-index="@i">
-                    <span class="mb-muted" style="width: 20px; text-align: center; font-size: 14px">@(i + 1)</span>
+                    <span class="mb-song-index">@(i + 1)</span>
                     <img src="@songs[i].ThumbnailUrl" class="mb-song-thumb" alt="" />
                     <div class="mb-song-main">
                         <div class="mb-song-title">@songs[i].Title</div>

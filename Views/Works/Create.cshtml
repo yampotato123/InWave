@@ -7,18 +7,18 @@
 
 <div asp-validation-summary="All" class="mb-errors"></div>
 
-<form asp-action="Create" method="post" enctype="multipart/form-data" style="max-width: 640px">
+<form asp-action="Create" method="post" enctype="multipart/form-data" style="max-width: 620px">
     <div class="mb-4">
-        <div class="mb-muted mb-2">1. 選擇照片</div>
+        <div class="mb-eyebrow" style="margin-bottom: 12px">1 — 選擇照片</div>
         <div class="mb-file-drop">
             <input type="file" class="form-control" id="photoFile" name="photoFile"
                    accept=".jpg,.jpeg,.png,.webp" />
-            <div class="mb-muted mt-2" style="font-size: 13px">jpg / png / webp,10 MB 以內</div>
+            <div class="mb-muted mt-3" style="font-size: 13px">jpg / png / webp,10 MB 以內</div>
         </div>
     </div>
 
-    <div class="mb-4">
-        <div class="mb-muted mb-2">2. 這張照片的情緒是?</div>
+    <div style="margin-bottom: 36px">
+        <div class="mb-eyebrow" style="margin-bottom: 12px">2 — 這張照片的情緒是?</div>
         <div class="mb-chips">
             @foreach (var mood in MoodKeywordMapper.AllMoods)
             {
@@ -29,5 +29,5 @@
         </div>
     </div>
 
-    <button type="submit" class="mb-btn">產生推薦歌單</button>
+    <button type="submit" class="mb-btn">下一步:修圖</button>
 </form>

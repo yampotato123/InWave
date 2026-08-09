@@ -3,19 +3,26 @@
     ViewData["Title"] = "首頁";
 }
 
-<h1 class="mb-page-title">一張照片,一份可以播放的歌單</h1>
-<p class="mb-muted" style="max-width: 560px">
-    上傳照片、選一種情緒,MusicBuddy 幫你把當下的氛圍變成歌單。
-</p>
+@* 首頁沒有照片可以取樣,所以刻意保持安靜——招牌留給作品頁 *@
+<div style="max-width: 720px; padding-top: 24px">
+    <h1 class="mb-page-title">一張照片,<br />一份可以播放的歌單</h1>
+    <p class="mb-muted" style="font-size: 17px; line-height: 1.7; max-width: 520px">
+        上傳一張照片,選一種情緒,MusicBuddy 幫你把當下的氛圍變成歌單。
+        照片會決定作品的顏色。
+    </p>
 
-<div class="mb-chips my-4">
-    @foreach (var mood in MoodKeywordMapper.AllMoods)
-    {
-        <a class="mb-chip text-decoration-none" asp-controller="Works" asp-action="Create">@mood</a>
-    }
-</div>
+    <div style="margin: 40px 0 12px">
+        <div class="mb-eyebrow" style="margin-bottom: 14px">從一種情緒開始</div>
+        <div class="mb-chips">
+            @foreach (var mood in MoodKeywordMapper.AllMoods)
+            {
+                <a class="mb-chip" asp-controller="Works" asp-action="Create">@mood</a>
+            }
+        </div>
+    </div>
 
-<div class="d-flex gap-3 mt-4">
-    <a asp-controller="Works" asp-action="Create" class="mb-btn">建立新作品</a>
-    <a asp-controller="Works" asp-action="Index" class="mb-btn mb-btn-outline">我的作品</a>
+    <div class="d-flex gap-3" style="margin-top: 40px">
+        <a asp-controller="Works" asp-action="Create" class="mb-btn">建立新作品</a>
+        <a asp-controller="Works" asp-action="Index" class="mb-btn mb-btn-outline">我的作品</a>
+    </div>
 </div>
