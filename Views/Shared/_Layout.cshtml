@@ -4,40 +4,52 @@
     var currentAction = (string?)ViewContext.RouteData.Values["action"];
     string NavClass(string controller, string action) =>
         "mb-nav-item" + (controller == currentController && action == currentAction ? " active" : "");
+
+    // 有照片的頁面把路徑放進 ViewData["Backdrop"],整頁就會被那張照片染色
+    var backdrop = ViewData["Backdrop"] as string;
 }
 <html lang="zh-Hant" data-bs-theme="dark">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - MyMusicBuddy</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Serif+TC:wght@300;400&display=swap" />
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/MyMusicBuddy.styles.css" asp-append-version="true" />
 </head>
 <body>
+    @if (!string.IsNullOrEmpty(backdrop))
+    {
+        <div class="mb-backdrop" style="background-image: url('@backdrop')"></div>
+    }
+
     <div class="mb-shell">
         <aside class="mb-sidebar">
             <a class="mb-logo" asp-controller="Home" asp-action="Index">
                 <span class="mb-logo-badge"></span>MusicBuddy
             </a>
             <a class="@NavClass("Home", "Index")" asp-controller="Home" asp-action="Index">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
                     <path d="M4 11l8-7 8 7v9h-5.5v-6h-5v6H4z" stroke-linejoin="round" />
                 </svg>
-                首頁
+                <span>首頁</span>
             </a>
             <a class="@NavClass("Works", "Create")" asp-controller="Works" asp-action="Create">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
                     <circle cx="12" cy="12" r="8.5" />
                     <path d="M12 8.5v7M8.5 12h7" stroke-linecap="round" />
                 </svg>
-                建立新作品
+                <span>建立新作品</span>
             </a>
             <a class="@NavClass("Works", "Index")" asp-controller="Works" asp-action="Index">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
                     <path d="M6 4.5h12a1 1 0 0 1 1 1V20l-7-4.2L5 20V5.5a1 1 0 0 1 1-1z" stroke-linejoin="round" />
                 </svg>
-                我的作品
+                <span>我的作品</span>
             </a>
         </aside>
         <main class="mb-main">
@@ -47,6 +59,7 @@
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src="~/js/accent.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
