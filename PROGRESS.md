@@ -1,7 +1,7 @@
 # PROGRESS
 
 最後更新：2026-08-10
-遠端：https://github.com/yampotato123/InWave（**私有**）　分支 `main`
+遠端：https://github.com/yampotato123/InWave（**私有**）　分支 `main`　最新 commit `abdb41c`
 
 ---
 
@@ -170,7 +170,24 @@ Phase 1 已驗證完成，所以視覺這輪可以放手做。
    用腳本比對 HTML 前要先 `HtmlDecode`，否則會誤判成 bug。
 3. **`form.submit()` 不會觸發 submit 事件**，`requestSubmit()` 才會。
    修圖頁靠 submit 事件把 canvas 轉成 data URL，用錯會送出空值。
-4. **建置前要先停掉 `dotnet run`**，否則 `.exe` 被鎖住，建置失敗。
+4. **建置前要先停掉 `dotnet run`**，否則 `.exe` 被鎖住，建置失敗（`MSB3027`／`MSB3021`）。
+   在 Visual Studio 按建置卻噴「處理序無法存取檔案」時，第一個要查的就是這個。
+5. **要拿 claude.ai/design 專案的檔案，用 `DesignSync` 工具，不要走瀏覽器下載。**
+   瀏覽器路徑試了四種全失敗：WebFetch 403、Chrome 擋多檔自動下載、打包單檔仍不落地、
+   帶 cookie 的 fetch 被擴充功能封鎖。`DesignSync` 的 `list_files` / `get_file` 一次就成功。
+   通則：瀏覽器自動化碰不到瀏覽器 chrome 與作業系統對話框（下載提示、另存新檔），
+   卡在那裡就換路，不要一直重試。
+
+## 驗證腳本（目前在暫存區，未進版控）
+
+端對端驗證腳本寫在這次 session 的 scratchpad，**session 結束後會消失**：
+
+- `e2e.ps1` — 走完上傳 → 情緒 → 推薦 → 存歌單 → 作品頁
+- `e2e-edit.ps1` — 修圖頁 17 項，含錯誤路徑（無預覽圖、偽造濾鏡名）、滑桿夾值、狀態還原
+- `dbq/` — 小工具，直接查 SQLite 內容（`dotnet run --project dbq -- <db> "<sql>"`）
+
+要保留的話得搬進 repo（例如 `scripts/`）。目前**沒有搬**，所以下次要回歸測試得重寫。
+比對 HTML 前記得先 `HtmlDecode`，並把空白壓成單一空格（見上面第 2 條）。
 
 ---
 
