@@ -2,147 +2,139 @@
 @model MyMusicBuddy.Models.ViewModels.EditViewModel
 @{
     ViewData["Title"] = "修圖";
-    ViewData["Backdrop"] = Model.PhotoPath;
+
+    // 濾鏡的 CSS 與搜尋修飾詞一律取自 PhotoFilters,不在這裡另寫一份——
+    // 兩邊各寫一份必然走鐘,README 也特別提醒過這點。英文副標只是顯示用。
+    var englishLabel = new Dictionary<string, string>
+    {
+        ["暖陽"] = "Sunlit", ["冷夜"] = "Cool night", ["褪色"] = "Faded"
+    };
+    var filterJs = PhotoFilters.All.ToDictionary(f => f.KeywordModifier, f => f.CssFilter);
+    var currentModifier = PhotoFilters.Find(Model.FilterName)?.KeywordModifier ?? "none";
 }
 
-@* 只為了取樣主色而載入的圖:canvas 是用 JS 建的 Image,accent.js 掃不到 *@
-<img src="@Model.PhotoPath" alt="" aria-hidden="true" data-accent-src
-     style="position:absolute; width:1px; height:1px; opacity:0; pointer-events:none" />
+<div asp-validation-summary="All" class="mb-errors" style="margin:20px 40px 0"></div>
 
-<div style="display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap">
-    <h1 class="mb-page-title" style="margin-bottom: 4px">修圖</h1>
-    <span class="mb-muted" style="font-size: 15px">情緒已選「@Model.MoodName」</span>
-</div>
-<p class="mb-muted" style="font-size: 14px; margin-bottom: 28px">
-    濾鏡除了改變照片外觀,也會影響推薦的音樂。
-</p>
-
-<div asp-validation-summary="All" class="mb-errors"></div>
-
-<form asp-action="Edit" method="post" id="edit-form">
+<form asp-action="Edit" method="post" class="iw-edit" id="editForm">
     <input type="hidden" asp-for="PhotoId" />
-    <input type="hidden" asp-for="EditedImage" id="EditedImage" />
+    <input type="hidden" asp-for="EditedImage" id="editedImage" />
 
-    <div class="row g-4">
-        <div class="col-lg-7">
-            <div class="mb-canvas-wrap">
-                <canvas id="preview"></canvas>
-            </div>
+    <div class="iw-edit-canvas">
+        <div class="frame">
+            <canvas id="preview"></canvas>
+            <img id="source" src="@Model.PhotoPath" alt="" style="display:none">
         </div>
-
-        <div class="col-lg-5">
-            <div class="mb-panel">
-                <div class="mb-eyebrow" style="margin-bottom: 18px">1 — 調整</div>
-
-                <label class="mb-slider-row">
-                    <span class="mb-slider-label">亮度</span>
-                    <input type="range" class="mb-slider" asp-for="Brightness" min="0" max="200" step="1" />
-                    <output class="mb-slider-value">@Model.Brightness</output>
-                </label>
-
-                <label class="mb-slider-row">
-                    <span class="mb-slider-label">對比</span>
-                    <input type="range" class="mb-slider" asp-for="Contrast" min="0" max="200" step="1" />
-                    <output class="mb-slider-value">@Model.Contrast</output>
-                </label>
-
-                <label class="mb-slider-row">
-                    <span class="mb-slider-label">飽和度</span>
-                    <input type="range" class="mb-slider" asp-for="Saturation" min="0" max="200" step="1" />
-                    <output class="mb-slider-value">@Model.Saturation</output>
-                </label>
-
-                <button type="button" class="mb-btn mb-btn-outline mb-btn-sm" id="reset-btn">重設為原圖</button>
-
-                <div class="mb-eyebrow" style="margin: 28px 0 12px">2 — 濾鏡</div>
-                <div class="mb-chips">
-                    <input type="radio" class="btn-check" name="FilterName" id="filter-none"
-                           value="" data-css="" autocomplete="off"
-                           checked="@(PhotoFilters.Find(Model.FilterName) == null)" />
-                    <label class="mb-chip" for="filter-none">無</label>
-
-                    @foreach (var filter in PhotoFilters.All)
-                    {
-                        <input type="radio" class="btn-check" name="FilterName" id="filter-@filter.Name"
-                               value="@filter.Name" data-css="@filter.CssFilter"
-                               data-modifier="@filter.KeywordModifier" autocomplete="off"
-                               checked="@(Model.FilterName == filter.Name)" />
-                        <label class="mb-chip" for="filter-@filter.Name">@filter.Name</label>
-                    }
-                </div>
-                <div class="mb-muted" style="font-size: 12.5px; margin-top: 14px; line-height: 1.6">
-                    搜尋關鍵字會變成<br /><span id="keyword-preview" style="color: var(--mb-accent)"></span>
-                </div>
-            </div>
-
-            <div class="d-flex gap-3" style="margin-top: 20px">
-                <button type="submit" class="mb-btn">套用並產生歌單</button>
-                <a class="mb-btn mb-btn-outline" asp-action="Recommend" asp-route-photoId="@Model.PhotoId">略過修圖</a>
-            </div>
+        <div class="iw-mono" style="display:flex;gap:26px">
+            <span>Brightness <b id="vB">@Model.Brightness</b></span>
+            <span>Contrast <b id="vC">@Model.Contrast</b></span>
+            <span>Saturation <b id="vS">@Model.Saturation</b></span>
         </div>
     </div>
+
+    <aside class="iw-edit-side">
+        <div>
+            <div class="iw-mono">Step 02 · 情緒 @Model.MoodName</div>
+            <h2 style="margin:12px 0 0;font-size:32px;font-weight:800;letter-spacing:-.03em">修圖 <span style="font-weight:400;color:var(--muted)">Adjust</span></h2>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:24px">
+            <label>
+                <span style="display:flex;justify-content:space-between;margin-bottom:11px"><span>亮度 Brightness</span></span>
+                <input class="iw-range" type="range" min="0" max="200" asp-for="Brightness" data-k="b" />
+            </label>
+            <label>
+                <span style="display:flex;justify-content:space-between;margin-bottom:11px"><span>對比 Contrast</span></span>
+                <input class="iw-range" type="range" min="0" max="200" asp-for="Contrast" data-k="c" />
+            </label>
+            <label>
+                <span style="display:flex;justify-content:space-between;margin-bottom:11px"><span>飽和度 Saturation</span></span>
+                <input class="iw-range" type="range" min="0" max="200" asp-for="Saturation" data-k="s" />
+            </label>
+        </div>
+
+        <div>
+            <div class="iw-mono" style="margin-bottom:14px">濾鏡 Filter · 會影響音樂推薦</div>
+            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
+                <label class="iw-filter @(PhotoFilters.Find(Model.FilterName) == null ? "is-on" : "")" data-mod="none">
+                    <input type="radio" asp-for="FilterName" value="" hidden />
+                    <span style="font-size:13px;font-weight:500">不套用</span>
+                    <span class="iw-mono" style="font-size:9px;letter-spacing:.14em">none</span>
+                </label>
+                @foreach (var f in PhotoFilters.All)
+                {
+                    <label class="iw-filter @(Model.FilterName == f.Name ? "is-on" : "")" data-mod="@f.KeywordModifier">
+                        <input type="radio" asp-for="FilterName" value="@f.Name" hidden />
+                        <span style="font-size:13px;font-weight:500">@f.Name @englishLabel.GetValueOrDefault(f.Name)</span>
+                        <span class="iw-mono" style="font-size:9px;letter-spacing:.14em">@f.KeywordModifier</span>
+                    </label>
+                }
+            </div>
+        </div>
+
+        <div style="padding:16px 18px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.03)">
+            <div class="iw-mono" style="font-size:9px">搜尋關鍵字 Keyword</div>
+            <div id="keyword" style="margin-top:9px;font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--accent)"></div>
+        </div>
+
+        <div style="margin-top:auto;display:flex;flex-direction:column;gap:9px">
+            <button class="iw-btn" type="submit">完成,取得推薦 →</button>
+            <button class="iw-btn iw-btn-ghost" type="button" id="reset">還原 Reset</button>
+            <a class="iw-btn iw-btn-ghost" asp-action="Recommend" asp-route-photoId="@Model.PhotoId">略過修圖 Skip</a>
+        </div>
+    </aside>
 </form>
 
 @section Scripts {
     <script>
-        // 長邊超過這個像素就縮圖再匯出,避免 data URL 撐爆表單欄位上限
+        // 長邊超過這個像素就縮圖再匯出,否則大照片的 data URL 會超過後端 4MB 的表單欄位上限
         const MAX_EDGE = 1600;
 
-        const canvas = document.getElementById("preview");
-        const ctx = canvas.getContext("2d");
-        const editedField = document.getElementById("EditedImage");
-        const sliders = ["Brightness", "Contrast", "Saturation"]
-            .map(id => document.getElementById(id));
-        const filterInputs = document.querySelectorAll("input[name='FilterName']");
-        const baseKeyword = @Html.Raw(Json.Serialize(MoodKeywordMapper.GetKeyword(Model.MoodName)));
+        const img = document.getElementById('source'), cv = document.getElementById('preview'), ctx = cv.getContext('2d');
+        // 濾鏡與關鍵字都由伺服器端產生,與 PhotoFilters / MoodKeywordMapper 保證一致
+        const CSSF = @Html.Raw(Json.Serialize(filterJs));
+        const BASE_KEYWORD = @Html.Raw(Json.Serialize(MoodKeywordMapper.GetKeyword(Model.MoodName)));
+        let mod = @Html.Raw(Json.Serialize(currentModifier));
 
-        function checkedFilter() {
-            return document.querySelector("input[name='FilterName']:checked");
+        function vals() {
+            return {
+                b: +document.querySelector('[data-k=b]').value,
+                c: +document.querySelector('[data-k=c]').value,
+                s: +document.querySelector('[data-k=s]').value
+            };
         }
 
-        // CSS filter 的同名函式是「連乘」的,所以濾鏡預設會疊在滑桿之上。
-        // 例:滑桿 brightness(1.2) 再加暖陽的 brightness(1.05) = 實際 1.26。這是預期行為。
-        function redraw() {
-            const [b, c, s] = sliders.map(el => Number(el.value) / 100);
-            const preset = checkedFilter()?.dataset.css ?? "";
-            ctx.filter = `brightness(${b}) contrast(${c}) saturate(${s}) ${preset}`.trim();
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        function draw() {
+            const v = vals();
+            if (img.naturalWidth) {
+                const scale = Math.min(1, MAX_EDGE / Math.max(img.naturalWidth, img.naturalHeight));
+                cv.width = Math.round(img.naturalWidth * scale);
+                cv.height = Math.round(img.naturalHeight * scale);
+            }
+            // CSS filter 的同名函式是連乘的,所以濾鏡會疊在滑桿之上,這是預期行為
+            ctx.filter = `brightness(${v.b}%) contrast(${v.c}%) saturate(${v.s}%) ${mod !== 'none' ? CSSF[mod] : ''}`.trim();
+            ctx.clearRect(0, 0, cv.width, cv.height);
+            ctx.drawImage(img, 0, 0, cv.width, cv.height);
+            vB.textContent = v.b; vC.textContent = v.c; vS.textContent = v.s;
+            keyword.textContent = BASE_KEYWORD + (mod !== 'none' ? ' ' + mod : '');
         }
 
-        function syncLabels() {
-            sliders.forEach(el => {
-                el.closest(".mb-slider-row").querySelector(".mb-slider-value").textContent = el.value;
-            });
-            const modifier = checkedFilter()?.dataset.modifier;
-            document.getElementById("keyword-preview").textContent =
-                modifier ? `${baseKeyword} ${modifier}` : baseKeyword;
-        }
+        img.onload = draw;
+        if (img.complete && img.naturalWidth) draw();
 
-        const img = new Image();
-        img.onload = () => {
-            const scale = Math.min(1, MAX_EDGE / Math.max(img.naturalWidth, img.naturalHeight));
-            canvas.width = Math.round(img.naturalWidth * scale);
-            canvas.height = Math.round(img.naturalHeight * scale);
-            redraw();
-        };
-        img.src = @Html.Raw(Json.Serialize(Model.PhotoPath));
-
-        sliders.forEach(el => el.addEventListener("input", () => { redraw(); syncLabels(); }));
-        filterInputs.forEach(el => el.addEventListener("change", () => { redraw(); syncLabels(); }));
-
-        document.getElementById("reset-btn").addEventListener("click", () => {
-            sliders.forEach(el => el.value = 100);
-            document.getElementById("filter-none").checked = true;
-            redraw();
-            syncLabels();
+        document.querySelectorAll('.iw-range').forEach(r => r.addEventListener('input', draw));
+        document.querySelectorAll('.iw-filter').forEach(l => l.addEventListener('click', () => {
+            document.querySelectorAll('.iw-filter').forEach(x => x.classList.remove('is-on'));
+            l.classList.add('is-on'); mod = l.dataset.mod; draw();
+        }));
+        document.getElementById('reset').addEventListener('click', () => {
+            document.querySelectorAll('.iw-range').forEach(r => r.value = 100);
+            mod = 'none';
+            document.querySelectorAll('.iw-filter').forEach((x, i) => x.classList.toggle('is-on', i === 0));
+            document.querySelector('.iw-filter input').checked = true;
+            draw();
         });
-
-        // 送出前把 canvas 的內容轉成 data URL 塞進隱藏欄位
-        document.getElementById("edit-form").addEventListener("submit", () => {
-            editedField.value = canvas.toDataURL("image/jpeg", 0.85);
+        document.getElementById('editForm').addEventListener('submit', () => {
+            document.getElementById('editedImage').value = cv.toDataURL('image/jpeg', 0.85);
         });
-
-        syncLabels();
     </script>
 }

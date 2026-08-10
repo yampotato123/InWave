@@ -3,31 +3,42 @@
     ViewData["Title"] = "建立新作品";
 }
 
-<h1 class="mb-page-title">建立新作品</h1>
+<main class="iw-page" style="max-width:680px">
+    <div class="iw-mono">Step 01</div>
+    <h1 class="iw-serif" style="margin:12px 0 34px;font-size:46px;line-height:1.1">建立新作品</h1>
 
-<div asp-validation-summary="All" class="mb-errors"></div>
+    <div asp-validation-summary="All" class="mb-errors"></div>
 
-<form asp-action="Create" method="post" enctype="multipart/form-data" style="max-width: 620px">
-    <div class="mb-4">
-        <div class="mb-eyebrow" style="margin-bottom: 12px">1 — 選擇照片</div>
-        <div class="mb-file-drop">
+    <form asp-action="Create" method="post" enctype="multipart/form-data">
+        <div class="iw-mono" style="margin-bottom:12px">一 — 選擇照片</div>
+        <div class="iw-glass" style="padding:28px 26px;border-radius:14px">
             <input type="file" class="form-control" id="photoFile" name="photoFile"
-                   accept=".jpg,.jpeg,.png,.webp" />
-            <div class="mb-muted mt-3" style="font-size: 13px">jpg / png / webp,10 MB 以內</div>
+                   accept=".jpg,.jpeg,.png,.webp"
+                   style="background:transparent;border:none;color:#fff;padding:0" />
+            <div class="iw-mono" style="margin-top:14px;font-size:10px">jpg / png / webp · 10 MB 以內</div>
         </div>
-    </div>
 
-    <div style="margin-bottom: 36px">
-        <div class="mb-eyebrow" style="margin-bottom: 12px">2 — 這張照片的情緒是?</div>
-        <div class="mb-chips">
+        <div class="iw-mono" style="margin:34px 0 12px">二 — 這張照片的情緒是?</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
             @foreach (var mood in MoodKeywordMapper.AllMoods)
             {
                 <input type="radio" class="btn-check" name="moodName" id="mood-@mood"
                        value="@mood" autocomplete="off" />
-                <label class="mb-chip" for="mood-@mood">@mood</label>
+                <label class="iw-pill" for="mood-@mood" style="cursor:pointer">@mood</label>
             }
         </div>
-    </div>
 
-    <button type="submit" class="mb-btn">下一步:修圖</button>
-</form>
+        <button type="submit" class="iw-btn" style="margin-top:38px">下一步:修圖 →</button>
+    </form>
+</main>
+
+@section Scripts {
+    <script>
+        // btn-check 的選取樣式:沿用 iw-pill 的 is-on
+        document.querySelectorAll("input[name='moodName']").forEach(r =>
+            r.addEventListener('change', () => {
+                document.querySelectorAll("label.iw-pill").forEach(l => l.classList.remove('is-on'));
+                if (r.checked) document.querySelector(`label[for="${r.id}"]`).classList.add('is-on');
+            }));
+    </script>
+}

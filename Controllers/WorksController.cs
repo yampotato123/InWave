@@ -36,7 +36,8 @@ public class WorksController : Controller
     public async Task<IActionResult> Index()
     {
         var playlists = await _db.Playlists
-            .Include(p => p.Photo).ThenInclude(ph => ph.Mood)   // 卡片要顯示情緒;少了會安靜顯示「—」
+            .Include(p => p.Photo).ThenInclude(ph => ph.Mood)   // 書背印刷色由情緒決定;少了會全部變成預設灰
+            .Include(p => p.PlaylistSongs)                      // 收藏櫃要顯示 TRACKS 數;少了會顯示 0
             .OrderByDescending(p => p.CreatedAt)
             .ToListAsync();
         return View(playlists);

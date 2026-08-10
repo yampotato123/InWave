@@ -1,134 +1,103 @@
 @model MyMusicBuddy.Models.Playlist
 @{
     ViewData["Title"] = Model.Name;
-    var photoPath = Model.Photo.EditedPath ?? Model.Photo.OriginalPath;
-    ViewData["Backdrop"] = photoPath;
     var songs = Model.PlaylistSongs.Select(ps => ps.Song).ToList();
-    // 給底部播放列 JS 用的歌單資料
-    var songsJson = System.Text.Json.JsonSerializer.Serialize(
-        songs.Select(s => new { videoId = s.YoutubeVideoId, title = s.Title, artist = s.Artist, thumb = s.ThumbnailUrl }));
+    var first = songs.FirstOrDefault();
 }
 
-<div class="row g-5" style="padding-bottom: 110px">
-    <div class="col-lg-5">
-        <img src="@photoPath" data-accent-src alt="作品照片"
-             style="width: 100%; border-radius: 14px; display: block; box-shadow: 0 20px 56px rgba(0,0,0,.55)" />
+<main class="iw-stage">
+    <div class="photo"><img src="@(Model.Photo?.EditedPath ?? Model.Photo?.OriginalPath)" alt="@Model.Name"></div>
+    <div class="veil"></div>
 
-        <div class="mb-mood-rule"></div>
-        <div class="mb-mood">@(Model.Photo.Mood?.MoodName ?? "—")</div>
-
-        <h1 class="mb-section-title" style="margin-top: 22px">@Model.Name</h1>
-        <p class="mb-muted" style="font-size: 13.5px; margin-top: 6px">
-            @Model.CreatedAt.ToLocalTime().ToString("yyyy 年 M 月 d 日")　・　@songs.Count 首
-        </p>
-    </div>
-
-    <div class="col-lg-7">
-        <div class="mb-player ratio ratio-16x9" style="margin-bottom: 22px">
-            <div id="yt-player"></div>
+    <div style="position:relative;z-index:10;display:grid;grid-template-columns:1fr 400px;gap:48px;align-items:end;height:100%;padding:0 44px 128px">
+        <div>
+            <div class="iw-mono" style="color:var(--accent);letter-spacing:.3em">@Model.Photo?.Mood?.MoodName</div>
+            <h1 class="iw-serif" style="margin:16px 0 0;font-size:82px;line-height:1;text-shadow:0 8px 40px rgba(0,0,0,.7)">@Model.Name</h1>
+            <div class="iw-mono" style="display:flex;gap:26px;margin-top:20px;color:rgba(255,255,255,.62)">
+                <span>@Model.CreatedAt.ToLocalTime().ToString("yyyy.MM.dd")</span><span>@songs.Count tracks</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:18px;margin-top:34px">
+                <div class="iw-disc"></div>
+                <div>
+                    <div id="npTitle" style="font-size:22px;font-weight:600;letter-spacing:-.02em">@first?.Title</div>
+                    <div id="npArtist" style="margin-top:6px;font-size:13px;color:rgba(255,255,255,.55);font-weight:300">@first?.Artist</div>
+                </div>
+            </div>
         </div>
 
-        <ul class="mb-song-list" id="song-list">
-            @for (var i = 0; i < songs.Count; i++)
-            {
-                <li class="mb-song-row playable @(i == 0 ? "active" : "")" data-index="@i">
-                    <span class="mb-song-index">@(i + 1)</span>
-                    <img src="@songs[i].ThumbnailUrl" class="mb-song-thumb" alt="" />
-                    <div class="mb-song-main">
-                        <div class="mb-song-title">@songs[i].Title</div>
-                        <div class="mb-song-artist">@songs[i].Artist</div>
+        <aside class="iw-glass" style="align-self:end;max-height:62vh;display:flex;flex-direction:column">
+            <div class="iw-mono" style="display:flex;justify-content:space-between;padding:15px 20px;border-bottom:1px solid var(--line);font-size:10px">
+                <span>歌單 Tracklist</span><span>@songs.Count</span>
+            </div>
+            <div style="overflow:auto;padding:6px 8px">
+                @for (var i = 0; i < songs.Count; i++)
+                {
+                    <div class="iw-track @(i == 0 ? "is-on" : "")" data-i="@i" data-vid="@songs[i].YoutubeVideoId">
+                        <span class="iw-mono" style="width:18px;flex:none;font-size:11px;letter-spacing:0">@((i + 1).ToString("00"))</span>
+                        <img src="@songs[i].ThumbnailUrl" alt="" style="width:44px;height:32px;border-radius:5px;object-fit:cover;flex:none">
+                        <span style="min-width:0;display:flex;flex-direction:column;gap:3px">
+                            <span style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">@songs[i].Title</span>
+                            <span style="font-size:11px;color:rgba(255,255,255,.45);font-weight:300;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">@songs[i].Artist</span>
+                        </span>
                     </div>
-                </li>
-            }
-        </ul>
+                }
+            </div>
+        </aside>
     </div>
-</div>
+</main>
 
-@* 底部播放列:目前曲目 + 上一首/播放/下一首 *@
-<div class="mb-playerbar">
-    <div class="mb-playerbar-controls">
-        <button type="button" class="mb-iconbtn" id="btn-prev" aria-label="上一首">
-            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M6 5h2v14H6zM20 5v14l-10-7z" />
-            </svg>
-        </button>
-        <button type="button" class="mb-iconbtn mb-iconbtn-lg" id="btn-play" aria-label="播放/暫停">
-            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" id="icon-play">
-                <path d="M8 5v14l11-7z" />
-            </svg>
-            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" id="icon-pause" style="display:none">
-                <path d="M7 5h4v14H7zM13 5h4v14h-4z" />
-            </svg>
-        </button>
-        <button type="button" class="mb-iconbtn" id="btn-next" aria-label="下一首">
-            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M16 5h2v14h-2zM4 5v14l10-7z" />
-            </svg>
-        </button>
+<footer class="iw-player">
+    <div style="display:flex;align-items:center;gap:14px;min-width:0">
+        <div class="iw-eq"><i></i><i></i><i></i></div>
+        <div style="min-width:0">
+            <div id="barTitle" style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">@first?.Title</div>
+            <div id="barArtist" style="font-size:11px;color:rgba(255,255,255,.45);font-weight:300">@first?.Artist</div>
+        </div>
     </div>
-    <img src="" class="mb-now-thumb" id="now-thumb" alt="" />
-    <div class="mb-song-main">
-        <div class="mb-song-title" id="now-title"></div>
-        <div class="mb-song-artist" id="now-artist"></div>
+    <div style="display:flex;align-items:center;gap:18px">
+        <span id="prev" style="cursor:pointer;color:rgba(255,255,255,.5)">◀◀</span>
+        <span id="toggle" style="display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;background:#fff;color:#000;font-size:12px;cursor:pointer">❚❚</span>
+        <span id="next" style="cursor:pointer;color:rgba(255,255,255,.5)">▶▶</span>
     </div>
-</div>
+    <div style="justify-self:end"><div id="player" style="width:1px;height:1px;overflow:hidden"></div></div>
+</footer>
 
 @section Scripts {
     <script>
-        const songs = @Html.Raw(songsJson);
-        let player = null;
-        let current = 0;
+        // YouTube IFrame API:播完自動接下一首
+        const rows = [...document.querySelectorAll('.iw-track')];
+        const ids = rows.map(r => r.dataset.vid);
+        let idx = 0, yt = null;
 
-        // YouTube IFrame API:載入後會自動呼叫 onYouTubeIframeAPIReady
-        const tag = document.createElement("script");
-        tag.src = "https://www.youtube.com/iframe_api";
-        document.head.appendChild(tag);
-
+        // 先定義 callback 再載入 API——順序反過來的話,API 若先載完就永遠不會回呼
         window.onYouTubeIframeAPIReady = () => {
-            player = new YT.Player("yt-player", {
-                videoId: songs[0]?.videoId,
-                playerVars: { rel: 0 },
-                events: {
-                    onStateChange: e => {
-                        // 播完自動下一首;同步播放/暫停圖示
-                        if (e.data === YT.PlayerState.ENDED) playIndex(current + 1);
-                        setPlayingIcon(e.data === YT.PlayerState.PLAYING);
-                    },
-                },
+            yt = new YT.Player('player', {
+                videoId: ids[0], playerVars: { autoplay: 0 },
+                events: { onStateChange: e => { if (e.data === YT.PlayerState.ENDED) go(idx + 1); } }
             });
         };
-
-        function setPlayingIcon(playing) {
-            document.getElementById("icon-play").style.display = playing ? "none" : "";
-            document.getElementById("icon-pause").style.display = playing ? "" : "none";
+        if (ids.length > 0) {
+            const tag = document.createElement('script');
+            tag.src = 'https://www.youtube.com/iframe_api';
+            document.head.appendChild(tag);
         }
 
-        function updateBar() {
-            const s = songs[current];
-            if (!s) return;
-            document.getElementById("now-thumb").src = s.thumb;
-            document.getElementById("now-title").textContent = s.title;
-            document.getElementById("now-artist").textContent = s.artist;
-            document.querySelectorAll("#song-list .mb-song-row").forEach((row, i) =>
-                row.classList.toggle("active", i === current));
+        function go(n) {
+            if (ids.length === 0) return;
+            idx = (n + ids.length) % ids.length;
+            rows.forEach((r, i) => r.classList.toggle('is-on', i === idx));
+            const spans = rows[idx].querySelectorAll('span span');
+            npTitle.textContent = barTitle.textContent = spans[0].textContent;
+            npArtist.textContent = barArtist.textContent = spans[1].textContent;
+            yt?.loadVideoById(ids[idx]);
         }
-
-        function playIndex(i) {
-            if (!player || songs.length === 0) return;
-            current = (i + songs.length) % songs.length; // 頭尾循環
-            player.loadVideoById(songs[current].videoId);
-            updateBar();
-        }
-
-        document.getElementById("btn-play").addEventListener("click", () => {
-            if (!player) return;
-            player.getPlayerState() === YT.PlayerState.PLAYING ? player.pauseVideo() : player.playVideo();
-        });
-        document.getElementById("btn-prev").addEventListener("click", () => playIndex(current - 1));
-        document.getElementById("btn-next").addEventListener("click", () => playIndex(current + 1));
-        document.querySelectorAll("#song-list .mb-song-row").forEach(row =>
-            row.addEventListener("click", () => playIndex(Number(row.dataset.index))));
-
-        updateBar();
+        rows.forEach((r, i) => r.addEventListener('click', () => go(i)));
+        prev.onclick = () => go(idx - 1);
+        next.onclick = () => go(idx + 1);
+        toggle.onclick = () => {
+            const s = yt?.getPlayerState();
+            if (s === YT.PlayerState.PLAYING) { yt.pauseVideo(); toggle.textContent = '▶'; }
+            else { yt?.playVideo(); toggle.textContent = '❚❚'; }
+        };
     </script>
 }

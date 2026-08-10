@@ -1,86 +1,84 @@
 @model MyMusicBuddy.Models.ViewModels.RecommendViewModel
 @{
     ViewData["Title"] = "推薦歌單";
-    ViewData["Backdrop"] = Model.PhotoPath;
 }
 
-<div class="row g-5">
-    <div class="col-lg-5">
-        <img src="@Model.PhotoPath" data-accent-src alt="作品照片"
-             style="width: 100%; border-radius: 14px; display: block; box-shadow: 0 18px 48px rgba(0,0,0,.5)" />
+<main class="iw-page" style="max-width:1080px">
+    <div class="iw-mono">Step 03 · @Model.MoodName</div>
+    <h1 class="iw-serif" style="margin:12px 0 6px;font-size:46px;line-height:1.1">推薦歌單</h1>
+    <div class="iw-mono" style="color:var(--accent);margin-bottom:34px">@Model.SearchKeyword</div>
 
-        <div class="mb-mood-rule"></div>
-        <div class="mb-mood">@Model.MoodName</div>
-        <p class="mb-muted" style="font-size: 13px; margin-top: 18px; line-height: 1.7">
-            搜尋關鍵字<br />
-            <span style="color: var(--mb-accent)">@Model.SearchKeyword</span>
-        </p>
+    <div style="display:grid;grid-template-columns:340px 1fr;gap:40px;align-items:start">
+        <div>
+            <div class="iw-glass" style="padding:14px">
+                <img src="@Model.PhotoPath" alt="作品照片"
+                     style="width:100%;border-radius:10px;display:block" />
+            </div>
+            <div class="iw-glass ratio ratio-16x9" style="margin-top:14px">
+                <iframe id="preview-player" src="" title="試聽" allowfullscreen
+                        allow="autoplay; encrypted-media" style="border:none"></iframe>
+            </div>
+        </div>
 
-        @* 試聽用播放器:按歌曲列的「試聽」會把影片載入這裡 *@
-        <div class="mb-player ratio ratio-16x9" style="margin-top: 18px">
-            <iframe id="preview-player" src="" title="試聽" allowfullscreen
-                    allow="autoplay; encrypted-media"></iframe>
+        <div>
+            <div asp-validation-summary="All" class="mb-errors"></div>
+
+            <form asp-action="SavePlaylist" method="post">
+                <input type="hidden" asp-for="PhotoId" />
+                <input type="hidden" asp-for="PhotoPath" />
+                <input type="hidden" asp-for="MoodName" />
+                <input type="hidden" asp-for="SearchKeyword" />
+
+                <div class="iw-mono" style="margin-bottom:10px">歌單名稱 Playlist name</div>
+                <input asp-for="PlaylistName" class="mb-input" placeholder="幫這份歌單取個名字"
+                       style="font-family:inherit" />
+
+                <div class="iw-mono" style="margin:30px 0 10px">
+                    勾選要收進歌單的歌 · @Model.Songs.Count 首
+                </div>
+
+                <div class="iw-glass" style="padding:6px 8px">
+                    @for (var i = 0; i < Model.Songs.Count; i++)
+                    {
+                        <div class="iw-track">
+                            <input type="hidden" asp-for="Songs[i].VideoId" />
+                            <input type="hidden" asp-for="Songs[i].Title" />
+                            <input type="hidden" asp-for="Songs[i].Artist" />
+                            <input type="hidden" asp-for="Songs[i].ThumbnailUrl" />
+
+                            <input class="form-check-input" type="checkbox" asp-for="Songs[i].Selected"
+                                   title="加入歌單" style="flex:none" />
+                            <img src="@Model.Songs[i].ThumbnailUrl" alt=""
+                                 style="width:44px;height:32px;border-radius:5px;object-fit:cover;flex:none" />
+                            <span style="min-width:0;flex:1;display:flex;flex-direction:column;gap:3px">
+                                <span style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">@Model.Songs[i].Title</span>
+                                <span style="font-size:11px;color:rgba(255,255,255,.45);font-weight:300">@Model.Songs[i].Artist</span>
+                            </span>
+                            <button type="button" class="iw-pill preview-btn" data-video-id="@Model.Songs[i].VideoId">試聽</button>
+                        </div>
+                    }
+                </div>
+
+                @if (Model.Songs.Count == 0)
+                {
+                    <div class="iw-glass" style="padding:48px;text-align:center;color:var(--muted)">
+                        找不到歌曲——可能是 API 額度用完或網路問題,請稍後再試。
+                    </div>
+                }
+
+                <button type="submit" class="iw-btn" style="margin-top:28px">儲存歌單 →</button>
+            </form>
         </div>
     </div>
-
-    <div class="col-lg-7">
-        <div asp-validation-summary="All" class="mb-errors"></div>
-
-        <form asp-action="SavePlaylist" method="post">
-            <input type="hidden" asp-for="PhotoId" />
-            <input type="hidden" asp-for="PhotoPath" />
-            <input type="hidden" asp-for="MoodName" />
-            <input type="hidden" asp-for="SearchKeyword" />
-
-            <div class="mb-eyebrow" style="margin-bottom: 10px">歌單名稱</div>
-            <input asp-for="PlaylistName" class="mb-input" placeholder="幫這份歌單取個名字" />
-
-            <div class="mb-eyebrow" style="margin: 32px 0 10px">
-                勾選要收進歌單的歌　（@Model.Songs.Count 首）
-            </div>
-
-            <ul class="mb-song-list">
-                @for (var i = 0; i < Model.Songs.Count; i++)
-                {
-                    <li class="mb-song-row">
-                        <input type="hidden" asp-for="Songs[i].VideoId" />
-                        <input type="hidden" asp-for="Songs[i].Title" />
-                        <input type="hidden" asp-for="Songs[i].Artist" />
-                        <input type="hidden" asp-for="Songs[i].ThumbnailUrl" />
-
-                        <input class="form-check-input" type="checkbox" asp-for="Songs[i].Selected"
-                               title="加入歌單" />
-                        <img src="@Model.Songs[i].ThumbnailUrl" class="mb-song-thumb" alt="" />
-                        <div class="mb-song-main">
-                            <div class="mb-song-title">@Model.Songs[i].Title</div>
-                            <div class="mb-song-artist">@Model.Songs[i].Artist</div>
-                        </div>
-                        <button type="button" class="mb-btn mb-btn-outline mb-btn-sm preview-btn"
-                                data-video-id="@Model.Songs[i].VideoId">試聽</button>
-                    </li>
-                }
-            </ul>
-
-            @if (Model.Songs.Count == 0)
-            {
-                <div class="mb-empty">
-                    找不到歌曲——可能是 API 額度用完或網路問題,請稍後再試。
-                </div>
-            }
-
-            <button type="submit" class="mb-btn" style="margin-top: 28px">儲存歌單</button>
-        </form>
-    </div>
-</div>
+</main>
 
 @section Scripts {
     <script>
         // 點「試聽」把該影片載入左側播放器
         document.querySelectorAll(".preview-btn").forEach(btn => {
             btn.addEventListener("click", () => {
-                const id = btn.dataset.videoId;
                 document.getElementById("preview-player").src =
-                    `https://www.youtube.com/embed/${id}?autoplay=1`;
+                    `https://www.youtube.com/embed/${btn.dataset.videoId}?autoplay=1`;
             });
         });
     </script>

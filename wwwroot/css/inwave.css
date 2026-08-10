@@ -1,0 +1,330 @@
+/* InWave — 前端樣式(VHS 書背收藏櫃 / 玻璃面板 / 音浪)
+   放到 wwwroot/css/inwave.css,在 _Layout.cshtml 的 site.css 之後引入。
+   字體:Oswald + Instrument Serif + Noto Serif TC + JetBrains Mono(Google Fonts)。 */
+
+:root{
+  --bg:#000; --ink:#fff; --muted:rgba(255,255,255,.5);
+  --line:rgba(255,255,255,.12); --accent:#9FE8FF; --accent-2:#C9A7FF;
+  --glass:rgba(10,10,12,.42); --shelf-gap:9px; --spine-w:44px;
+}
+body.iw{margin:0;background:var(--bg);color:var(--ink);font-family:Archivo,"Noto Sans TC",sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+.iw-serif{font-family:"Instrument Serif","Noto Serif TC",serif;font-weight:400;letter-spacing:.005em}
+.iw-mono{font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
+
+/* 背景:CD 眩光 + 音波環 + 掃描線 */
+.iw-bg{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.iw-glare{position:absolute;top:-360px;left:50%;margin-left:-460px;width:920px;height:920px;border-radius:50%;
+  filter:blur(46px);mix-blend-mode:screen;opacity:.55;animation:iw-glare 26s linear infinite;
+  background:conic-gradient(from 40deg,transparent 0deg,rgba(255,255,255,.55) 26deg,var(--accent) 52deg,var(--accent-2) 78deg,transparent 118deg,transparent 210deg,rgba(255,255,255,.35) 246deg,#F5D020 268deg,transparent 310deg)}
+.iw-ripple{position:absolute;left:50%;top:52%;width:760px;height:760px;margin:-380px 0 0 -380px;border-radius:50%;
+  border:1px solid rgba(159,232,255,.33);animation:iw-ripple 7s ease-out infinite}
+.iw-ripple:nth-child(2){animation-delay:1.75s}.iw-ripple:nth-child(3){animation-delay:3.5s}.iw-ripple:nth-child(4){animation-delay:5.25s}
+.iw-scan{position:absolute;inset:0;opacity:.055;mix-blend-mode:overlay;background:repeating-linear-gradient(0deg,#fff 0 1px,transparent 1px 3px)}
+@keyframes iw-glare{0%{transform:rotate(0) scale(1)}50%{transform:rotate(180deg) scale(1.08)}100%{transform:rotate(360deg) scale(1)}}
+@keyframes iw-ripple{0%{transform:scale(.35);opacity:.55}100%{transform:scale(1.9);opacity:0}}
+@keyframes iw-wave{0%,100%{transform:scaleY(.18)}50%{transform:scaleY(1)}}
+@keyframes iw-eq{0%,100%{transform:scaleY(.3)}50%{transform:scaleY(1)}}
+@keyframes iw-spin{to{transform:rotate(360deg)}}
+
+/* 頂部切換列 */
+.iw-header{position:sticky;top:0;z-index:40;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:24px;
+  padding:18px 40px;border-bottom:1px solid var(--line);background:rgba(0,0,0,.6);backdrop-filter:blur(18px)}
+.iw-brand{display:flex;align-items:center;gap:11px;font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:rgba(255,255,255,.6);text-decoration:none}
+.iw-brand i{width:15px;height:15px;border-radius:50%;background:conic-gradient(from 0deg,#fff,var(--accent),var(--accent-2),#fff)}
+.iw-nav{display:flex;gap:4px;justify-content:center}
+.iw-pill{padding:9px 16px;border-radius:999px;background:transparent;border:1px solid var(--line);color:rgba(255,255,255,.45);
+  font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.14em;cursor:pointer;white-space:nowrap;transition:all .2s;text-decoration:none}
+.iw-pill:hover{color:#fff}
+.iw-pill.is-on{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.55);color:#fff}
+
+/* 收藏櫃 */
+.iw-shelf{position:relative;z-index:10;min-height:400px;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:var(--shelf-gap);padding:0 40px}
+.iw-spine{position:relative;flex:none;width:var(--spine-w);height:var(--h,320px);border-radius:4px;overflow:hidden;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:11px 0 9px;
+  border:1px solid rgba(255,255,255,.16);transition:all .25s ease;text-decoration:none;
+  box-shadow:inset -8px 0 16px rgba(0,0,0,.55),inset 8px 0 12px rgba(255,255,255,.08),0 24px 46px rgba(0,0,0,.66)}
+.iw-spine:hover{filter:brightness(1.25) saturate(1.15)}
+.iw-spine.is-on{width:calc(var(--spine-w) + 14px);border-color:rgba(255,255,255,.7);box-shadow:inset -8px 0 16px rgba(0,0,0,.55),0 24px 46px rgba(0,0,0,.66),0 0 34px rgba(159,232,255,.4)}
+.iw-spine .wear{position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(90deg,rgba(255,255,255,.28) 0 1px,rgba(0,0,0,.3) 1px 3px,transparent 4px 70%,rgba(0,0,0,.25) 88%,rgba(0,0,0,.5) 100%),
+  repeating-linear-gradient(180deg,rgba(255,255,255,.045) 0 1px,transparent 1px 4px),
+  radial-gradient(120% 30% at 50% 0%,rgba(255,255,255,.12),transparent 60%),
+  radial-gradient(120% 26% at 50% 100%,rgba(0,0,0,.45),transparent 60%)}
+.iw-spine .band{position:absolute;left:0;right:0;pointer-events:none;mix-blend-mode:soft-light}
+.iw-spine .cap{position:relative;flex:none;width:78%;border-radius:1px;opacity:.7;box-shadow:0 1px 3px rgba(0,0,0,.5)}
+.iw-spine .label{position:relative;display:flex;align-items:center;justify-content:center;width:82%;padding:8px 0;overflow:hidden}
+.iw-spine .title{font-family:Oswald,"Noto Serif TC",sans-serif;writing-mode:vertical-rl;text-orientation:upright;
+  font-size:12px;line-height:1;white-space:nowrap;overflow:hidden}
+.iw-spine.is-on .title{font-size:14px}
+.iw-spine .art{position:relative;flex:none;opacity:.9}
+.iw-spine .badge{position:relative;flex:none;display:flex;align-items:center;justify-content:center;min-width:15px;height:15px;padding:0 3px;
+  border-radius:2px;background:#E8E2D2;color:#121212;font-family:Oswald,sans-serif;font-size:9px;font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.6)}
+
+/* 中央封面(不裁切、不變形) */
+.iw-cover{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:330px;height:420px;
+  display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 34px 70px rgba(0,0,0,.85))}
+.iw-cover::before{content:"";position:absolute;width:300px;height:300px;border-radius:50%;filter:blur(30px);
+  background:radial-gradient(circle,rgba(159,232,255,.35),transparent 70%)}
+.iw-cover img{position:relative;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain}
+
+/* 音浪 */
+.iw-wave{display:flex;align-items:center;justify-content:center;gap:3px;height:34px;margin-top:22px}
+.iw-wave i{flex:none;width:2px;border-radius:1px;transform-origin:center;background:linear-gradient(180deg,transparent,var(--accent),transparent);animation:iw-wave 1.2s ease-in-out infinite}
+
+/* 玻璃面板與播放列 */
+.iw-glass{border:1px solid rgba(255,255,255,.16);border-radius:16px;background:var(--glass);backdrop-filter:blur(26px) saturate(1.3);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22),inset 0 -1px 0 rgba(255,255,255,.06),0 30px 70px rgba(0,0,0,.55);overflow:hidden}
+.iw-player{position:fixed;left:0;right:0;bottom:0;z-index:40;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:24px;
+  padding:14px 40px;background:rgba(6,6,8,.66);backdrop-filter:blur(24px) saturate(1.3);border-top:1px solid rgba(255,255,255,.14);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.16)}
+.iw-eq{display:flex;align-items:flex-end;gap:2px;height:16px;width:16px;flex:none}
+.iw-eq i{flex:1;height:100%;transform-origin:bottom;animation:iw-eq .9s ease-in-out infinite}
+.iw-eq i:nth-child(1){background:var(--accent)}.iw-eq i:nth-child(2){background:var(--accent-2);animation-delay:.25s}.iw-eq i:nth-child(3){background:#fff;animation-delay:.5s}
+.iw-btn{display:inline-block;padding:15px 26px;border:none;border-radius:999px;background:#fff;color:#000;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;text-align:center}
+.iw-btn:hover{background:var(--accent);color:#000}
+.iw-btn-ghost{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.28)}
+.iw-btn-ghost:hover{background:transparent;border-color:#fff;color:#fff}
+
+/* 修圖頁 */
+.iw-edit{display:grid;grid-template-columns:1fr 400px;min-height:calc(100vh - 61px)}
+.iw-edit-canvas{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:44px}
+.iw-edit-canvas .frame{position:relative;width:100%;max-width:720px;aspect-ratio:4/3;border-radius:12px;overflow:hidden;
+  border:1px solid rgba(255,255,255,.18);box-shadow:0 40px 90px rgba(0,0,0,.7)}
+.iw-edit-canvas canvas,.iw-edit-canvas img{width:100%;height:100%;object-fit:contain;background:#08080A}
+.iw-edit-side{position:sticky;top:61px;max-height:calc(100vh - 61px);overflow-y:auto;border-left:1px solid var(--line);
+  padding:44px 40px;display:flex;flex-direction:column;gap:34px;background:rgba(6,6,8,.55);backdrop-filter:blur(18px)}
+.iw-range{-webkit-appearance:none;appearance:none;width:100%;height:2px;background:rgba(255,255,255,.2);outline:none}
+.iw-range::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:#fff;cursor:pointer;box-shadow:0 0 12px rgba(159,232,255,.7)}
+.iw-range::-moz-range-thumb{width:14px;height:14px;border:none;border-radius:50%;background:#fff;cursor:pointer}
+.iw-filter{display:flex;flex-direction:column;gap:5px;align-items:flex-start;padding:13px 15px;border-radius:10px;cursor:pointer;text-align:left;
+  background:transparent;border:1px solid rgba(255,255,255,.16);color:#fff;transition:all .2s}
+.iw-filter.is-on{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.7)}
+/* 濾鏡預覽(與 Services/PhotoFilters.cs 對應) */
+.f-warm{filter:sepia(.25) saturate(1.15) hue-rotate(-8deg)}
+.f-night{filter:saturate(.85) hue-rotate(12deg) brightness(.92)}
+.f-vintage{filter:sepia(.4) saturate(.7) contrast(.92)}
+
+/* 播放頁 */
+.iw-stage{position:relative;height:calc(100vh - 61px);min-height:640px;overflow:hidden}
+.iw-stage .photo{position:absolute;inset:0}
+.iw-stage .photo img{width:100%;height:100%;object-fit:cover}
+.iw-stage .veil{position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(90deg,rgba(0,0,0,.88) 0%,rgba(0,0,0,.3) 45%,rgba(0,0,0,.75) 100%),
+  linear-gradient(180deg,rgba(0,0,0,.45),transparent 25%,transparent 50%,rgba(0,0,0,.92))}
+.iw-disc{position:relative;width:92px;height:92px;flex:none}
+.iw-disc::before{content:"";position:absolute;inset:0;border-radius:50%;animation:iw-spin 12s linear infinite;
+  background:conic-gradient(from 30deg,#fff,var(--accent),var(--accent-2),#fff)}
+.iw-disc::after{content:"";position:absolute;inset:0;border-radius:50%;
+  background:radial-gradient(circle at 50% 50%,#000 0 18%,transparent 18.5%),repeating-radial-gradient(circle at 50% 50%,rgba(0,0,0,.4) 0 2px,transparent 2px 5px)}
+.iw-track{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;cursor:pointer;transition:background .18s}
+.iw-track:hover{background:rgba(255,255,255,.08)}
+.iw-track.is-on{background:rgba(255,255,255,.09)}
+
+/* 設計稿未涵蓋的頁面(首頁、建立作品、推薦歌單)共用的內容容器 */
+.iw-page{position:relative;z-index:10;max-width:980px;margin:0 auto;padding:56px 40px 120px}
+
+/* ===== 28 種書背版型:.iw-spine.s1 ~ .s28 ===== */
+.iw-spine.s1{background:linear-gradient(180deg,#101018 0%,var(--c)cc 18%,var(--c)99 70%,#0B0B10 100%)}
+.iw-spine.s1 .band{top:34%;height:30%;opacity:0.34;background:linear-gradient(180deg,#F2EFE622,var(--c)55,transparent)}
+.iw-spine.s1 .cap{height:12px;background:linear-gradient(180deg,#F2EFE6,#CFC9BC)}
+.iw-spine.s1 .label{max-height:96px;flex:none;border-radius:2px;background:linear-gradient(180deg,#F2EFE6,#F2EFE6d9);box-shadow:0 1px 0 rgba(255,255,255,.5),0 6px 14px rgba(0,0,0,.45)}
+.iw-spine.s1 .title{color:#131316;font-weight:700;letter-spacing:.02em}
+.iw-spine.s1 .art{width:64%;height:3px;border-radius:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent)}
+
+.iw-spine.s2{background:linear-gradient(180deg,#0A0A0C 0%,#101015 30%,var(--c)66 62%,#08080A 100%)}
+.iw-spine.s2 .band{top:8%;height:22%;opacity:0.25;background:linear-gradient(180deg,#E4E7EA22,var(--c)55,transparent)}
+.iw-spine.s2 .cap{height:16px;background:linear-gradient(180deg,#F2EFE6,#CFC9BC)}
+.iw-spine.s2 .label{max-height:120px;flex:none;border-radius:2px;background:linear-gradient(180deg,#E4E7EA,#E4E7EAd9);box-shadow:0 1px 0 rgba(255,255,255,.5),0 6px 14px rgba(0,0,0,.45)}
+.iw-spine.s2 .title{color:#1A1A1F;font-weight:500;letter-spacing:.12em}
+.iw-spine.s2 .art{width:64%;height:6px;border-radius:1px;background:repeating-radial-gradient(circle at 50% 50%,var(--accent) 0 1.5px,transparent 1.5px 5px)}
+
+.iw-spine.s3{background:linear-gradient(180deg,#E8E0CC 0%,#D8CEB4 46%,#C3B79A 78%,var(--c)88 100%)}
+.iw-spine.s3 .band{top:72%;height:24%;opacity:0.30;background:linear-gradient(180deg,#EDE7D822,var(--c)55,transparent)}
+.iw-spine.s3 .cap{height:16px;background:repeating-linear-gradient(90deg,#1A1A1A 0 2px,transparent 2px 4px)}
+.iw-spine.s3 .label{max-height:78%;flex:1;border-radius:1px;background:linear-gradient(180deg,#EDE7D8,#EDE7D8d9);box-shadow:0 1px 0 rgba(255,255,255,.5),0 6px 14px rgba(0,0,0,.45)}
+.iw-spine.s3 .title{color:#141414;font-weight:800;letter-spacing:0}
+.iw-spine.s3 .art{width:64%;height:6px;border-radius:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent)}
+
+.iw-spine.s4{background:linear-gradient(180deg,#101018 0%,var(--c)cc 18%,var(--c)99 70%,#0B0B10 100%)}
+.iw-spine.s4 .band{top:18%;height:46%;opacity:0.41;background:linear-gradient(180deg,rgba(255,255,255,.13),var(--c)55,transparent)}
+.iw-spine.s4 .cap{height:10px;background:linear-gradient(180deg,#F2EFE6,#CFC9BC)}
+.iw-spine.s4 .label{background:none;box-shadow:none;max-height:70%}
+.iw-spine.s4 .title{color:#fff;font-weight:600;letter-spacing:.08em;text-shadow:0 1px 8px rgba(0,0,0,.9)}
+.iw-spine.s4 .art{width:14px;height:14px;border-radius:50%;background:radial-gradient(circle at 50% 50%,transparent 0 38%,var(--accent) 39% 46%,transparent 47%)}
+.iw-spine.s4 .badge{background:rgba(0,0,0,.55);color:rgba(255,255,255,.75)}
+
+.iw-spine.s5{background:linear-gradient(180deg,#1A1E2E 0%,var(--c)aa 40%,#151824 78%,#0A0A0E 100%)}
+.iw-spine.s5 .band{top:46%;height:26%;opacity:0.28;background:linear-gradient(180deg,#FFFFFF22,var(--c)55,transparent)}
+.iw-spine.s5 .cap{height:11px;background:linear-gradient(180deg,#F2EFE6,#CFC9BC)}
+.iw-spine.s5 .label{max-height:78px;flex:none;border-radius:9px;background:linear-gradient(180deg,#FFFFFF,#FFFFFFd9);box-shadow:0 1px 0 rgba(255,255,255,.5),0 6px 14px rgba(0,0,0,.45)}
+.iw-spine.s5 .title{color:#101014;font-weight:800;letter-spacing:.01em}
+.iw-spine.s5 .art{width:64%;height:2px;border-radius:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent)}
+
+.iw-spine.s6{background:linear-gradient(180deg,#0A0A0C 0%,#101015 30%,var(--c)66 62%,#08080A 100%)}
+.iw-spine.s6 .band{top:60%;height:18%;opacity:0.36;background:linear-gradient(180deg,#0F0F1222,var(--c)55,transparent)}
+.iw-spine.s6 .cap{height:17px;background:linear-gradient(180deg,#F2EFE6,#CFC9BC)}
+.iw-spine.s6 .label{max-height:140px;flex:none;border-radius:2px;background:linear-gradient(180deg,#0F0F12,#0F0F12d9);box-shadow:0 1px 0 rgba(255,255,255,.5),0 6px 14px rgba(0,0,0,.45)}
+.iw-spine.s6 .title{color:#F5F2EA;font-weight:700;letter-spacing:.04em}
+.iw-spine.s6 .art{width:64%;height:16px;border-radius:1px;background:repeating-conic-gradient(var(--accent) 0% 25%,transparent 0% 50%) 0 0/6px 6px}
+.iw-spine.s6 .badge{background:rgba(0,0,0,.55);color:rgba(255,255,255,.75)}
+
+.iw-spine.s7{background:linear-gradient(180deg,#101018 0%,var(--c)cc 18%,var(--c)99 70%,#0B0B10 100%)}
+.iw-spine.s7 .band{top:12%;height:34%;opacity:0.39;background:linear-gradient(180deg,#FF3B4E22,var(--c)55,transparent)}
+.iw-spine.s7 .cap{height:13px;background:linear-gradient(180deg,#F2EFE6,#CFC9BC)}
+.iw-spine.s7 .label{max-height:104px;flex:none;border-radius:3px;background:linear-gradient(180deg,#FF3B4E,#FF3B4Ed9);box-shadow:0 1px 0 rgba(255,255,255,.5),0 6px 14px rgba(0,0,0,.45)}
+.iw-spine.s7 .title{color:#FFFFFF;font-weight:800;letter-spacing:.02em}
+.iw-spine.s7 .art{width:64%;height:4px;border-radius:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent)}
+
+.iw-spine.s8{background:linear-gradient(180deg,#E8E0CC 0%,#D8CEB4 46%,#C3B79A 78%,var(--c)88 100%)}
+.iw-spine.s8 .band{top:56%;height:30%;opacity:0.22;background:linear-gradient(180deg,#F7F3E822,var(--c)55,transparent)}
+.iw-spine.s8 .cap{height:16px;background:repeating-linear-gradient(90deg,#1A1A1A 0 2px,transparent 2px 4px)}
+.iw-spine.s8 .label{max-height:112px;flex:none;border-radius:1px;background:linear-gradient(180deg,#F7F3E8,#F7F3E8d9);box-shadow:0 1px 0 rgba(255,255,255,.5),0 6px 14px rgba(0,0,0,.45)}
+.iw-spine.s8 .title{color:#2A2622;font-weight:400;letter-spacing:.16em}
+.iw-spine.s8 .art{width:64%;height:5px;border-radius:1px;background:repeating-radial-gradient(circle at 50% 50%,var(--accent) 0 1.5px,transparent 1.5px 5px)}
+
+.iw-spine.s9{background:linear-gradient(180deg,#0A0A0C 0%,#101015 30%,var(--c)66 62%,#08080A 100%)}
+.iw-spine.s9 .band{top:24%;height:20%;opacity:0.33;background:linear-gradient(180deg,#14182122,var(--c)55,transparent)}
+.iw-spine.s9 .cap{height:10px;background:linear-gradient(180deg,#F2EFE6,#CFC9BC)}
+.iw-spine.s9 .label{max-height:78%;flex:1;border-radius:2px;background:linear-gradient(180deg,#141821,#141821d9);box-shadow:0 1px 0 rgba(255,255,255,.5),0 6px 14px rgba(0,0,0,.45)}
+.iw-spine.s9 .title{color:#9FE8FF;font-weight:600;letter-spacing:.1em}
+.iw-spine.s9 .art{width:12px;height:12px;border-radius:50%;background:radial-gradient(circle at 50% 50%,transparent 0 38%,var(--accent) 39% 46%,transparent 47%)}
+.iw-spine.s9 .badge{background:rgba(0,0,0,.55);color:rgba(255,255,255,.75)}
+
+.iw-spine.s10{background:linear-gradient(180deg,#1A1E2E 0%,var(--c)aa 40%,#151824 78%,#0A0A0E 100%)}
+.iw-spine.s10 .band{top:30%;height:52%;opacity:0.44;background:linear-gradient(180deg,rgba(255,255,255,.13),var(--c)55,transparent)}
+.iw-spine.s10 .cap{height:14px;background:linear-gradient(180deg,#F2EFE6,#CFC9BC)}
+.iw-spine.s10 .label{background:none;box-shadow:none;max-height:70%}
+.iw-spine.s10 .title{color:#fff;font-weight:500;letter-spacing:.2em;text-shadow:0 1px 8px rgba(0,0,0,.9)}
+.iw-spine.s10 .art{width:64%;height:2px;border-radius:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent)}
+
+.iw-spine.s11{background:linear-gradient(180deg,#101018 0%,var(--c)cc 18%,var(--c)99 70%,#0B0B10 100%)}
+.iw-spine.s11 .band{top:66%;height:22%;opacity:0.32;background:linear-gradient(180deg,#11111422,var(--c)55,transparent)}
+.iw-spine.s11 .cap{height:11px;background:linear-gradient(180deg,#F2EFE6,#CFC9BC)}
+.iw-spine.s11 .label{max-height:126px;flex:none;border-radius:2px;background:linear-gradient(180deg,#111114,#111114d9);box-shadow:0 1px 0 rgba(255,255,255,.5),0 6px 14px rgba(0,0,0,.45)}
+.iw-spine.s11 .title{color:#F5D020;font-weight:800;letter-spacing:0}
+.iw-spine.s11 .art{width:64%;height:8px;border-radius:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent)}
+
+.iw-spine.s12{background:linear-gradient(180deg,#E8E0CC 0%,#D8CEB4 46%,#C3B79A 78%,var(--c)88 100%)}
+.iw-spine.s12 .band{top:14%;height:26%;opacity:0.19;background:linear-gradient(180deg,#E8E2D222,var(--c)55,transparent)}
+.iw-spine.s12 .cap{height:15px;background:repeating-linear-gradient(90deg,#1A1A1A 0 2px,transparent 2px 4px)}
+.iw-spine.s12 .label{max-height:150px;flex:none;border-radius:1px;background:linear-gradient(180deg,#E8E2D2,#E8E2D2d9);box-shadow:0 1px 0 rgba(255,255,255,.5),0 6px 14px rgba(0,0,0,.45)}
+.iw-spine.s12 .title{color:#1E1B16;font-weight:700;letter-spacing:.06em}
+.iw-spine.s12 .art{width:64%;height:14px;border-radius:1px;background:repeating-conic-gradient(var(--accent) 0% 25%,transparent 0% 50%) 0 0/6px 6px}
+.iw-spine.s12 .badge{background:rgba(0,0,0,.55);color:rgba(255,255,255,.75)}
+
+.iw-spine.s13{background:linear-gradient(180deg,#0A0A0C 0%,#101015 30%,var(--c)66 62%,#08080A 100%)}
+.iw-spine.s13 .band{top:42%;height:32%;opacity:0.37;background:linear-gradient(180deg,#FF7AC822,var(--c)55,transparent)}
+.iw-spine.s13 .cap{height:12px;background:linear-gradient(180deg,#F2EFE6,#CFC9BC)}
+.iw-spine.s13 .label{max-height:86px;flex:none;border-radius:12px;background:linear-gradient(180deg,#FF7AC8,#FF7AC8d9);box-shadow:0 1px 0 rgba(255,255,255,.5),0 6px 14px rgba(0,0,0,.45)}
+.iw-spine.s13 .title{color:#160B14;font-weight:800;letter-spacing:.02em}
+.iw-spine.s13 .art{width:64%;height:6px;border-radius:1px;background:repeating-radial-gradient(circle at 50% 50%,var(--accent) 0 1.5px,transparent 1.5px 5px)}
+
+.iw-spine.s14{background:linear-gradient(180deg,#101018 0%,var(--c)cc 18%,var(--c)99 70%,#0B0B10 100%)}
+.iw-spine.s14 .band{top:78%;height:18%;opacity:0.28;background:linear-gradient(180deg,#F2EFE622,var(--c)55,transparent)}
+.iw-spine.s14 .cap{height:17px;background:linear-gradient(180deg,#F2EFE6,#CFC9BC)}
+.iw-spine.s14 .label{max-height:78%;flex:1;border-radius:2px;background:linear-gradient(180deg,#F2EFE6,#F2EFE6d9);box-shadow:0 1px 0 rgba(255,255,255,.5),0 6px 14px rgba(0,0,0,.45)}
+.iw-spine.s14 .title{color:#131316;font-weight:400;letter-spacing:.18em}
+.iw-spine.s14 .art{width:64%;height:3px;border-radius:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent)}
+
+.iw-spine.s15{background:linear-gradient(180deg,#1A1E2E 0%,var(--c)aa 40%,#151824 78%,#0A0A0E 100%)}
+.iw-spine.s15 .band{top:20%;height:38%;opacity:0.40;background:linear-gradient(180deg,#C9F2E422,var(--c)55,transparent)}
+.iw-spine.s15 .cap{height:10px;background:linear-gradient(180deg,#F2EFE6,#CFC9BC)}
+.iw-spine.s15 .label{max-height:118px;flex:none;border-radius:4px;background:linear-gradient(180deg,#C9F2E4,#C9F2E4d9);box-shadow:0 1px 0 rgba(255,255,255,.5),0 6px 14px rgba(0,0,0,.45)}
+.iw-spine.s15 .title{color:#0E1A16;font-weight:600;letter-spacing:.04em}
+.iw-spine.s15 .art{width:10px;height:10px;border-radius:50%;background:radial-gradient(circle at 50% 50%,transparent 0 38%,var(--accent) 39% 46%,transparent 47%)}
+.iw-spine.s15 .badge{background:rgba(0,0,0,.55);color:rgba(255,255,255,.75)}
+
+.iw-spine.s16{background:linear-gradient(180deg,#0A0A0C 0%,#101015 30%,var(--c)66 62%,#08080A 100%)}
+.iw-spine.s16 .band{top:50%;height:40%;opacity:0.47;background:linear-gradient(180deg,rgba(255,255,255,.13),var(--c)55,transparent)}
+.iw-spine.s16 .cap{height:16px;background:linear-gradient(180deg,#F2EFE6,#CFC9BC)}
+.iw-spine.s16 .label{background:none;box-shadow:none;max-height:70%}
+.iw-spine.s16 .title{color:#C9A7FF;font-weight:700;letter-spacing:.12em;text-shadow:0 1px 8px rgba(0,0,0,.9)}
+.iw-spine.s16 .art{width:64%;height:18px;border-radius:1px;background:repeating-conic-gradient(var(--accent) 0% 25%,transparent 0% 50%) 0 0/6px 6px}
+
+.iw-spine.s17{background:linear-gradient(180deg,#101018 0%,var(--c)cc 18%,var(--c)99 70%,#0B0B10 100%)}
+.iw-spine.s17 .band{top:28%;height:28%;opacity:0.33;background:linear-gradient(180deg,#1B1F2A22,var(--c)55,transparent)}
+.iw-spine.s17 .cap{height:15px;background:linear-gradient(180deg,#F2EFE6,#CFC9BC)}
+.iw-spine.s17 .label{max-height:100px;flex:none;border-radius:2px;background:linear-gradient(180deg,#1B1F2A,#1B1F2Ad9);box-shadow:0 1px 0 rgba(255,255,255,.5),0 6px 14px rgba(0,0,0,.45)}
+.iw-spine.s17 .title{color:#EDEDED;font-weight:500;letter-spacing:.14em}
+.iw-spine.s17 .art{width:64%;height:5px;border-radius:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent)}
+.iw-spine.s17 .badge{background:rgba(0,0,0,.55);color:rgba(255,255,255,.75)}
+
+.iw-spine.s18{background:linear-gradient(180deg,#E8E0CC 0%,#D8CEB4 46%,#C3B79A 78%,var(--c)88 100%)}
+.iw-spine.s18 .band{top:62%;height:26%;opacity:0.17;background:linear-gradient(180deg,rgba(255,255,255,.13),var(--c)55,transparent)}
+.iw-spine.s18 .cap{height:11px;background:repeating-linear-gradient(90deg,#1A1A1A 0 2px,transparent 2px 4px)}
+.iw-spine.s18 .label{background:none;box-shadow:none;max-height:70%}
+.iw-spine.s18 .title{color:#20201C;font-weight:800;letter-spacing:.01em;text-shadow:0 1px 8px rgba(0,0,0,.9)}
+.iw-spine.s18 .art{width:64%;height:7px;border-radius:1px;background:repeating-radial-gradient(circle at 50% 50%,var(--accent) 0 1.5px,transparent 1.5px 5px)}
+
+.iw-spine.s19{background:linear-gradient(180deg,#1A1E2E 0%,var(--c)aa 40%,#151824 78%,#0A0A0E 100%)}
+.iw-spine.s19 .band{top:10%;height:24%;opacity:0.30;background:linear-gradient(180deg,#FFFFFF22,var(--c)55,transparent)}
+.iw-spine.s19 .cap{height:17px;background:linear-gradient(180deg,#F2EFE6,#CFC9BC)}
+.iw-spine.s19 .label{max-height:78%;flex:1;border-radius:6px;background:linear-gradient(180deg,#FFFFFF,#FFFFFFd9);box-shadow:0 1px 0 rgba(255,255,255,.5),0 6px 14px rgba(0,0,0,.45)}
+.iw-spine.s19 .title{color:#111114;font-weight:700;letter-spacing:.03em}
+.iw-spine.s19 .art{width:64%;height:4px;border-radius:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent)}
+
+.iw-spine.s20{background:linear-gradient(180deg,#0A0A0C 0%,#101015 30%,var(--c)66 62%,#08080A 100%)}
+.iw-spine.s20 .band{top:36%;height:30%;opacity:0.36;background:linear-gradient(180deg,#2ED9A022,var(--c)55,transparent)}
+.iw-spine.s20 .cap{height:13px;background:linear-gradient(180deg,#F2EFE6,#CFC9BC)}
+.iw-spine.s20 .label{max-height:132px;flex:none;border-radius:2px;background:linear-gradient(180deg,#2ED9A0,#2ED9A0d9);box-shadow:0 1px 0 rgba(255,255,255,.5),0 6px 14px rgba(0,0,0,.45)}
+.iw-spine.s20 .title{color:#08150F;font-weight:800;letter-spacing:0}
+.iw-spine.s20 .art{width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 50% 50%,transparent 0 38%,var(--accent) 39% 46%,transparent 47%)}
+
+.iw-spine.s21{background:linear-gradient(180deg,#101018 0%,var(--c)cc 18%,var(--c)99 70%,#0B0B10 100%)}
+.iw-spine.s21 .band{top:70%;height:20%;opacity:0.29;background:linear-gradient(180deg,#EFEAE022,var(--c)55,transparent)}
+.iw-spine.s21 .cap{height:10px;background:linear-gradient(180deg,#F2EFE6,#CFC9BC)}
+.iw-spine.s21 .label{max-height:108px;flex:none;border-radius:14px;background:linear-gradient(180deg,#EFEAE0,#EFEAE0d9);box-shadow:0 1px 0 rgba(255,255,255,.5),0 6px 14px rgba(0,0,0,.45)}
+.iw-spine.s21 .title{color:#141414;font-weight:600;letter-spacing:.09em}
+.iw-spine.s21 .art{width:64%;height:2px;border-radius:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent)}
+.iw-spine.s21 .badge{background:rgba(0,0,0,.55);color:rgba(255,255,255,.75)}
+
+.iw-spine.s22{background:linear-gradient(180deg,#E8E0CC 0%,#D8CEB4 46%,#C3B79A 78%,var(--c)88 100%)}
+.iw-spine.s22 .band{top:48%;height:34%;opacity:0.23;background:linear-gradient(180deg,#1A1A1A22,var(--c)55,transparent)}
+.iw-spine.s22 .cap{height:16px;background:repeating-linear-gradient(90deg,#1A1A1A 0 2px,transparent 2px 4px)}
+.iw-spine.s22 .label{max-height:92px;flex:none;border-radius:1px;background:linear-gradient(180deg,#1A1A1A,#1A1A1Ad9);box-shadow:0 1px 0 rgba(255,255,255,.5),0 6px 14px rgba(0,0,0,.45)}
+.iw-spine.s22 .title{color:#F5F0E4;font-weight:400;letter-spacing:.22em}
+.iw-spine.s22 .art{width:64%;height:12px;border-radius:1px;background:repeating-conic-gradient(var(--accent) 0% 25%,transparent 0% 50%) 0 0/6px 6px}
+
+.iw-spine.s23{background:linear-gradient(180deg,#1A1E2E 0%,var(--c)aa 40%,#151824 78%,#0A0A0E 100%)}
+.iw-spine.s23 .band{top:16%;height:42%;opacity:0.43;background:linear-gradient(180deg,#B9C6FF22,var(--c)55,transparent)}
+.iw-spine.s23 .cap{height:12px;background:linear-gradient(180deg,#F2EFE6,#CFC9BC)}
+.iw-spine.s23 .label{max-height:104px;flex:none;border-radius:3px;background:linear-gradient(180deg,#B9C6FF,#B9C6FFd9);box-shadow:0 1px 0 rgba(255,255,255,.5),0 6px 14px rgba(0,0,0,.45)}
+.iw-spine.s23 .title{color:#0C1030;font-weight:700;letter-spacing:.05em}
+.iw-spine.s23 .art{width:64%;height:6px;border-radius:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent)}
+.iw-spine.s23 .badge{background:rgba(0,0,0,.55);color:rgba(255,255,255,.75)}
+
+.iw-spine.s24{background:linear-gradient(180deg,#0A0A0C 0%,#101015 30%,var(--c)66 62%,#08080A 100%)}
+.iw-spine.s24 .band{top:82%;height:16%;opacity:0.33;background:linear-gradient(180deg,#F2EFE622,var(--c)55,transparent)}
+.iw-spine.s24 .cap{height:14px;background:linear-gradient(180deg,#F2EFE6,#CFC9BC)}
+.iw-spine.s24 .label{max-height:78%;flex:1;border-radius:1px;background:linear-gradient(180deg,#F2EFE6,#F2EFE6d9);box-shadow:0 1px 0 rgba(255,255,255,.5),0 6px 14px rgba(0,0,0,.45)}
+.iw-spine.s24 .title{color:#131316;font-weight:800;letter-spacing:.02em}
+.iw-spine.s24 .art{width:64%;height:5px;border-radius:1px;background:repeating-radial-gradient(circle at 50% 50%,var(--accent) 0 1.5px,transparent 1.5px 5px)}
+
+.iw-spine.s25{background:linear-gradient(180deg,#101018 0%,var(--c)cc 18%,var(--c)99 70%,#0B0B10 100%)}
+.iw-spine.s25 .band{top:22%;height:50%;opacity:0.50;background:linear-gradient(180deg,rgba(255,255,255,.13),var(--c)55,transparent)}
+.iw-spine.s25 .cap{height:16px;background:linear-gradient(180deg,#F2EFE6,#CFC9BC)}
+.iw-spine.s25 .label{background:none;box-shadow:none;max-height:70%}
+.iw-spine.s25 .title{color:#F5D020;font-weight:800;letter-spacing:.06em;text-shadow:0 1px 8px rgba(0,0,0,.9)}
+.iw-spine.s25 .art{width:18px;height:18px;border-radius:50%;background:radial-gradient(circle at 50% 50%,transparent 0 38%,var(--accent) 39% 46%,transparent 47%)}
+
+.iw-spine.s26{background:linear-gradient(180deg,#E8E0CC 0%,#D8CEB4 46%,#C3B79A 78%,var(--c)88 100%)}
+.iw-spine.s26 .band{top:6%;height:28%;opacity:0.21;background:linear-gradient(180deg,#DCD3BE22,var(--c)55,transparent)}
+.iw-spine.s26 .cap{height:15px;background:repeating-linear-gradient(90deg,#1A1A1A 0 2px,transparent 2px 4px)}
+.iw-spine.s26 .label{max-height:78%;flex:1;border-radius:2px;background:linear-gradient(180deg,#DCD3BE,#DCD3BEd9);box-shadow:0 1px 0 rgba(255,255,255,.5),0 6px 14px rgba(0,0,0,.45)}
+.iw-spine.s26 .title{color:#191713;font-weight:500;letter-spacing:.13em}
+.iw-spine.s26 .art{width:64%;height:3px;border-radius:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent)}
+.iw-spine.s26 .badge{background:rgba(0,0,0,.55);color:rgba(255,255,255,.75)}
+
+.iw-spine.s27{background:linear-gradient(180deg,#1A1E2E 0%,var(--c)aa 40%,#151824 78%,#0A0A0E 100%)}
+.iw-spine.s27 .band{top:54%;height:26%;opacity:0.41;background:linear-gradient(180deg,#0E0E1222,var(--c)55,transparent)}
+.iw-spine.s27 .cap{height:11px;background:linear-gradient(180deg,#F2EFE6,#CFC9BC)}
+.iw-spine.s27 .label{max-height:136px;flex:none;border-radius:8px;background:linear-gradient(180deg,#0E0E12,#0E0E12d9);box-shadow:0 1px 0 rgba(255,255,255,.5),0 6px 14px rgba(0,0,0,.45)}
+.iw-spine.s27 .title{color:#9FE8FF;font-weight:600;letter-spacing:.11em}
+.iw-spine.s27 .art{width:64%;height:15px;border-radius:1px;background:repeating-conic-gradient(var(--accent) 0% 25%,transparent 0% 50%) 0 0/6px 6px}
+
+.iw-spine.s28{background:linear-gradient(180deg,#0A0A0C 0%,#101015 30%,var(--c)66 62%,#08080A 100%)}
+.iw-spine.s28 .band{top:38%;height:36%;opacity:0.39;background:linear-gradient(180deg,#F5D02022,var(--c)55,transparent)}
+.iw-spine.s28 .cap{height:13px;background:linear-gradient(180deg,#F2EFE6,#CFC9BC)}
+.iw-spine.s28 .label{max-height:88px;flex:none;border-radius:2px;background:linear-gradient(180deg,#F5D020,#F5D020d9);box-shadow:0 1px 0 rgba(255,255,255,.5),0 6px 14px rgba(0,0,0,.45)}
+.iw-spine.s28 .title{color:#141200;font-weight:800;letter-spacing:0}
+.iw-spine.s28 .art{width:64%;height:9px;border-radius:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent)}

@@ -1,7 +1,39 @@
 # PROGRESS
 
-最後更新：2026-08-07（工作進行於 2026-08-06）
-遠端：https://github.com/yampotato123/InWave　分支 `main`　最新 commit `0f4f5c9`
+最後更新：2026-08-10
+遠端：https://github.com/yampotato123/InWave（**私有**）　分支 `main`
+
+---
+
+## 更新（2026-08-10）：視覺方向改走 InWave,以下 Phase 2 的三個方向已作廢
+
+原本規劃的「照片定調 / 暗房 / 展場」三選一,使用者選了 A 並實作完成（commit `042192f`、`f62a894`）,
+但之後改用 claude.ai/design 產出的 **InWave** 設計全站覆蓋。
+
+**InWave 設計**（VHS 書背收藏櫃 / 玻璃面板 / 音浪）：
+- 來源：claude.ai design 專案 `625628ae-1794-4d27-8a9b-23a8b36788c4` 的 `frontend/`
+- 透過 `DesignSync` 工具讀取（`list_files` / `get_file`）——瀏覽器下載被 Chrome 擋住,這條路才是可行的
+- 新增 `wwwroot/css/inwave.css`（28 種書背版型）
+- 改寫 `_Layout.cshtml`（`<body class="iw">`、頂部切換列、背景層,`inwave.css` 在 `site.css` 之後）
+- 覆蓋 `Works/Index`（收藏櫃）、`Works/Details`（播放頁）、`Works/Edit`（修圖工作台）
+- `Home/Index`、`Works/Create`、`Works/Recommend` 設計稿沒涵蓋,自行以 InWave 語彙補齊
+- 舊版備份在 `backup-before-inwave-*/`（被 `.gitignore` 的 `Backup*/` 擋住,不進版控）
+
+**刻意偏離設計稿的三處**（都有理由,不要「修正」回去）：
+1. 濾鏡 CSS 與搜尋關鍵字改由 `PhotoFilters` / `MoodKeywordMapper` 產生。設計稿硬編在 JS 且與後端值不一致
+2. 補回長邊 1600px 縮圖。設計稿用原尺寸 + q0.9,大照片會超過後端 4MB 上限
+3. YouTube API callback 改成先定義再載入 script,否則 API 先載完就不會回呼
+
+**InWave 尚未接的部分**（設計稿 README 自己標註的）：
+- 情緒篩選 chips 是靜態的,要篩得在 `WorksController.Index` 加 query 參數
+- 收藏櫃的選取固定第一筆,要換成 `?selected=` 或前端 JS 切換
+- 收藏櫃只有 1 份歌單時,中央封面會壓在書背上（版面預期是一整排書背分列兩側）
+
+**資安檢查（2026-08-10）**：repo 為私有；版控中無任何金鑰、照片或 `.db`；
+`appsettings.json` 的 `ApiKey` 為空字串,YouTube key 走 `dotnet user-secrets`。
+**轉公開前要處理**：commit 歷史含協作者的公司信箱 `jiayi.wang@qburger.com.tw`,屬他人個資。
+
+---
 
 ---
 

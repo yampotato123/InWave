@@ -3,26 +3,33 @@
     ViewData["Title"] = "首頁";
 }
 
-@* 首頁沒有照片可以取樣,所以刻意保持安靜——招牌留給作品頁 *@
-<div style="max-width: 720px; padding-top: 24px">
-    <h1 class="mb-page-title">一張照片,<br />一份可以播放的歌單</h1>
-    <p class="mb-muted" style="font-size: 17px; line-height: 1.7; max-width: 520px">
-        上傳一張照片,選一種情緒,MusicBuddy 幫你把當下的氛圍變成歌單。
-        照片會決定作品的顏色。
+<main class="iw-page" style="text-align:center;padding-top:96px">
+    <div class="iw-mono">照片 · 情緒 · 歌單</div>
+    <h1 class="iw-serif" style="margin:22px 0 0;font-size:clamp(40px,7vw,74px);line-height:1.06">
+        一張照片,<br />一份可以播放的歌單
+    </h1>
+    <p style="margin:24px auto 0;max-width:520px;color:var(--muted);font-size:16px;line-height:1.8;font-weight:300">
+        上傳一張照片,選一種情緒,InWave 幫你把當下的氛圍變成歌單,
+        再收進你的收藏櫃。
     </p>
 
-    <div style="margin: 40px 0 12px">
-        <div class="mb-eyebrow" style="margin-bottom: 14px">從一種情緒開始</div>
-        <div class="mb-chips">
-            @foreach (var mood in MoodKeywordMapper.AllMoods)
-            {
-                <a class="mb-chip" asp-controller="Works" asp-action="Create">@mood</a>
-            }
-        </div>
+    <div class="iw-wave" style="margin-top:34px">
+        @for (var i = 0; i < 44; i++)
+        {
+            <i style="height:@(26 + (int)(Math.Sin(i * 0.8) * 10) + (i * 13) % 9)px;animation-duration:@((1.1 + (i % 5) * 0.14).ToString("0.00"))s;animation-delay:@(((i % 7) * 0.09).ToString("0.00"))s"></i>
+        }
     </div>
 
-    <div class="d-flex gap-3" style="margin-top: 40px">
-        <a asp-controller="Works" asp-action="Create" class="mb-btn">建立新作品</a>
-        <a asp-controller="Works" asp-action="Index" class="mb-btn mb-btn-outline">我的作品</a>
+    <div style="display:flex;gap:10px;justify-content:center;margin-top:34px;flex-wrap:wrap">
+        <a class="iw-btn" asp-controller="Works" asp-action="Create">建立新作品</a>
+        <a class="iw-btn iw-btn-ghost" asp-controller="Works" asp-action="Index">我的收藏櫃</a>
     </div>
-</div>
+
+    <div class="iw-mono" style="margin:56px 0 14px">八種情緒 Eight moods</div>
+    <div style="display:flex;justify-content:center;gap:6px;flex-wrap:wrap">
+        @foreach (var mood in MoodKeywordMapper.AllMoods)
+        {
+            <a class="iw-pill" asp-controller="Works" asp-action="Create">@mood</a>
+        }
+    </div>
+</main>

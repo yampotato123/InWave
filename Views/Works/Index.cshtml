@@ -1,37 +1,84 @@
 @model List<MyMusicBuddy.Models.Playlist>
 @{
-    ViewData["Title"] = "我的作品";
+    ViewData["Title"] = "我的歌單";
+    var sel = Model.FirstOrDefault();
 }
 
-<div class="d-flex justify-content-between align-items-end flex-wrap gap-3" style="margin-bottom: 32px">
-    <div>
-        <h1 class="mb-page-title" style="margin-bottom: 6px">我的作品</h1>
-        <span class="mb-muted" style="font-size: 14px">@Model.Count 件</span>
-    </div>
-    <a asp-action="Create" class="mb-btn">建立新作品</a>
-</div>
+@* 收藏櫃:每份歌單一支 VHS 書背,款式依 Id 輪替 s1~s28 *@
+<main style="position:relative;z-index:10;min-height:calc(100vh - 61px);display:flex;flex-direction:column;justify-content:center;padding:32px 0 116px">
 
-@if (Model.Count == 0)
-{
-    <div class="mb-empty">
-        還沒有作品——<a asp-action="Create">建立第一個</a>吧!
+    <div style="display:flex;justify-content:center;gap:6px;padding-bottom:40px;flex-wrap:wrap">
+        @foreach (var mood in new[] { "全部 All", "夜色 Night", "午後 Afternoon", "夢幻 Dreamy", "安靜 Calm" })
+        {
+            @* 篩選尚未接上 WorksController.Index 的 query 參數,先維持靜態 *@
+            <button class="iw-pill @(mood == "全部 All" ? "is-on" : "")" type="button">@mood</button>
+        }
     </div>
-}
 
-@* 每張卡片各自從自己的照片取樣主色,所以這面牆是一片各自不同的顏色 *@
-<div class="mb-card-grid">
-    @foreach (var playlist in Model)
+    @if (Model.Count == 0)
     {
-        <a asp-action="Details" asp-route-id="@playlist.Id" class="mb-card">
-            <div class="mb-card-thumb">
-                <img src="@(playlist.Photo.EditedPath ?? playlist.Photo.OriginalPath)"
-                     data-accent-src data-accent-scope=".mb-card" alt="" />
-                <span class="mb-card-play"></span>
-            </div>
-            <div class="mb-card-title">@playlist.Name</div>
-            <div class="mb-card-sub">
-                @(playlist.Photo.Mood?.MoodName ?? "—")　・　@playlist.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd")
-            </div>
-        </a>
+        <div style="text-align:center">
+            <div class="iw-mono" style="margin-bottom:18px">收藏櫃是空的 Empty shelf</div>
+            <a class="iw-btn" asp-action="Create">建立第一份歌單</a>
+        </div>
     }
-</div>
+    else
+    {
+        <div class="iw-shelf">
+            @foreach (var p in Model)
+            {
+                var skin = "s" + ((p.Id % 28) + 1);
+                var on = sel != null && p.Id == sel.Id;
+                var h = 292 + (p.Id * 37) % 88;
+                <a class="iw-spine @skin @(on ? "is-on" : "")"
+                   style="--c:@Html.Raw(MoodColor(p.Photo?.Mood?.MoodName)); --h:@(on ? 396 : h)px"
+                   asp-controller="Works" asp-action="Details" asp-route-id="@p.Id" title="@p.Name">
+                    <span class="wear"></span>
+                    <span class="band"></span>
+                    <span class="cap"></span>
+                    <span class="label"><span class="title">@p.Name</span></span>
+                    <span class="art"></span>
+                    <span class="badge">@p.CreatedAt.ToLocalTime().ToString("MM/dd")</span>
+                </a>
+            }
+
+            @if (sel != null)
+            {
+                <div class="iw-cover">
+                    <img src="@(sel.Photo?.EditedPath ?? sel.Photo?.OriginalPath)" alt="@sel.Name">
+                </div>
+            }
+        </div>
+
+        @if (sel != null)
+        {
+            <div style="text-align:center;padding-top:52px">
+                <h1 class="iw-serif" style="margin:0;font-size:56px;line-height:1.05">@sel.Name</h1>
+                <div class="iw-mono" style="margin-top:13px;color:var(--accent);letter-spacing:.26em">
+                    @sel.Photo?.Mood?.MoodName · @sel.PlaylistSongs.Count TRACKS · @sel.CreatedAt.ToLocalTime().ToString("yyyy.MM.dd")
+                </div>
+                <div class="iw-wave">
+                    @for (var i = 0; i < 44; i++)
+                    {
+                        <i style="height:@(26 + (int)(Math.Sin(i * 0.8) * 10) + (i * 13) % 9)px;animation-duration:@((1.1 + (i % 5) * 0.14).ToString("0.00"))s;animation-delay:@(((i % 7) * 0.09).ToString("0.00"))s"></i>
+                    }
+                </div>
+                <div style="display:flex;gap:10px;justify-content:center;margin-top:26px;flex-wrap:wrap">
+                    <a class="iw-btn" asp-controller="Works" asp-action="Details" asp-route-id="@sel.Id">▶ 播放 Play</a>
+                    <a class="iw-btn iw-btn-ghost" asp-controller="Works" asp-action="Edit" asp-route-id="@sel.PhotoId">重新修圖 Edit</a>
+                    <a class="iw-btn iw-btn-ghost" asp-controller="Works" asp-action="Create">建立新作品</a>
+                </div>
+            </div>
+        }
+    }
+</main>
+
+@functions {
+    // 情緒 → 書背印刷色(對應 MoodKeywordMapper.AllMoods)
+    static string MoodColor(string? mood) => mood switch
+    {
+        "夜色" => "#2B4BD1", "午後" => "#E08A2B", "溫暖" => "#D94F2B", "懷舊" => "#8A7A4F",
+        "夢幻" => "#9B4BD1", "安靜" => "#3F6B6B", "活力" => "#D1B32B", "慶祝" => "#D12B6B",
+        _ => "#3A3A44"
+    };
+}
