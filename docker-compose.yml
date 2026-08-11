@@ -7,10 +7,17 @@ services:
     restart: unless-stopped
 
     # 左邊是你電腦上的埠,右邊是容器裡的埠。
-    # 容器裡是 8080(Dockerfile 的 ASPNETCORE_HTTP_PORTS),
-    # 對外用 5120 是為了跟你本機 dotnet run 的習慣一致。
+    # 容器裡是 8080(Dockerfile 的 ASPNETCORE_HTTP_PORTS)。
+    #
+    # 對外刻意用 5121 而非 5120:5120 是 Properties/launchSettings.json 裡
+    # 本機 dotnet run / F5 用的埠,兩邊都綁 5120 的話,容器只要開著就無法在
+    # 本機偵錯,會噴 System.IO.IOException: Failed to bind to address
+    # http://[::1]:5120: address already in use。
+    #
+    #   本機偵錯(F5) → http://localhost:5120
+    #   容器          → http://localhost:5121
     ports:
-      - "5120:8080"
+      - "5121:8080"
 
     environment:
       # 容器預設時區是 UTC,不設這個的話台北晚上 8 點後建立的作品
