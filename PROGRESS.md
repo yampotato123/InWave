@@ -1,7 +1,7 @@
 # PROGRESS
 
 最後更新：2026-08-11
-遠端：https://github.com/yampotato123/InWave（**私有**）　分支 `main`　最新 commit `30a8bcd`
+遠端：https://github.com/yampotato123/InWave（**私有**）　分支 `main`　最新 commit `d8a89ec`
 
 ---
 
@@ -38,11 +38,51 @@ compose、`_Layout` 的 scoped CSS 打包檔（現為 `InWave.styles.css`）皆�
 - `docs/superpowers/specs/2026-08-11-docker-n8n-ai-design.md` — 五階段設計
 - `docs/superpowers/specs/2026-08-11-codebase-survey.md` — 全專案掃描報告
 
-### 下一步：階段 2，把 n8n 收編進同一個 compose
+### 階段 2 完成：n8n 已納入同一個 compose（commit `d8a89ec`）
 
-現行 n8n 來自 `C:\Users\admin\source\repos\n8n0807`。
-搬移時**必須以該處的 `n8n_storage` 為準**——
-`C:\Users\admin\source\repos\Docker\n8n\n8n_storage` 是 2026-08-10 的舊快照。
+n8n 由 `C:\Users\admin\source\repos\n8n0807` 遷入。
+**原資料夾保留未動可當後路**；`C:\Users\admin\source\repos\Docker\n8n\n8n_storage`
+是 2026-08-10 的舊快照，**不要**拿它當來源。
+
+作法：先停容器（SQLite 跑著時複製會拿到半套）→ 複製而非搬移 →
+逐檔比對大小確認 `.sqlite` / `-shm` / `-wal` 三個檔完整 → 才動 compose。
+
+順便修好原設定的三個問題：
+
+| 原本 | 問題 | 改成 |
+|---|---|---|
+| `N8N_HOST=http://localhost:5678/home/workflows` | 該變數只吃主機名稱 | 刪除，改用下兩者 |
+| `WEBHOOK_URL` | n8n 已標為淘汰 | `N8N_WEBHOOK_URL` |
+| `restart: always` | 手動停止也會被拉起 | `unless-stopped` |
+
+另加 `N8N_EDITOR_BASE_URL`。對外埠維持 **5678**——`tailscale serve`
+已設定代理到 `127.0.0.1:5678`，改了就對不上。
+
+**容器間連線**（同一個 compose 的服務自動同網路，用服務名稱互連）：
+
+```
+從 inwave 容器  → http://n8n:5678
+從 n8n 容器     → http://inwave:8080
+```
+
+實測佐證：`inwave` 解析 `n8n` 得 `172.20.0.3`；`n8n` 打 `http://inwave:8080`
+取得首頁 HTML；`n8n` 打 `http://localhost:8080` 連線被拒
+（容器內的 `localhost` 指容器自身）。
+
+資料完整性驗證：`/rest/settings` 的 `showSetupOnFirstLoad` 為 `false`，
+既有帳號已帶入；`tailscale serve` 代理未受影響。
+
+| 服務 | 網址 |
+|---|---|
+| InWave（容器） | http://localhost:5121 |
+| InWave（本機 F5） | http://localhost:5120 |
+| n8n | http://localhost:5678 ／ https://desktop-cj8q9sn.tail02844b.ts.net |
+
+### 下一步：階段 3，AI 判讀照片
+
+設計見 `docs/superpowers/specs/2026-08-11-docker-n8n-ai-design.md` 階段 3。
+重點：接入點是 `WorksController.cs:199` 單一行；AI 結果須持久化
+（`Recommend` 是 GET，重新整理會重複付費呼叫），需一次 migration。
 
 ---
 
