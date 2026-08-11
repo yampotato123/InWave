@@ -73,13 +73,24 @@ ASP.NET Core 的組態系統本就會讀取環境變數，設定 `YouTube__ApiKe
 
 ### 2.3 外部網路依賴
 
-| 依賴 | 位置 | 失敗時的表現 |
-|---|---|---|
-| Google Fonts（6 個字體家族） | `_Layout.cshtml:12-14` | 不報錯，靜默 fallback 成系統字體，InWave 視覺走樣 |
-| YouTube IFrame API | `Details.cshtml:81` | 播放器不出現 |
-| YouTube Data API | `YouTubeService.cs:52` | 回空清單並記 log（已妥善處理） |
+**須區分「瀏覽器去連」與「容器去連」——兩者的失敗情境完全不同。**
+本節初版把三項都當成容器依賴，2026-08-11 實測後更正。
 
-前兩項在階段 1 驗收時須明確檢查，不能只看「頁面有開起來」。
+| 依賴 | 誰發出請求 | 位置 | 失敗時的表現 |
+|---|---|---|---|
+| Google Fonts（6 個字體家族） | **瀏覽器** | `_Layout.cshtml:12-14` | 不報錯，靜默 fallback 成系統字體 |
+| YouTube IFrame API | **瀏覽器** | `Details.cshtml:81` | 播放器不出現 |
+| YouTube Data API（搜尋） | **容器** | `YouTubeService.cs:52` | 回空清單並記 log（已妥善處理） |
+
+前兩項與容器組態無關：容器只是把含有 `<link>` / `<script>` 的 HTML 送出去，
+實際下載由使用者的瀏覽器完成。**容器就算完全沒有對外網路，這兩項照樣運作。**
+
+**只有第三項是真正的容器對外依賴**，且目前**尚未驗證**——
+容器未設定 `YouTube__ApiKey`，`YouTubeService.cs:44` 會提前回傳示範資料，
+第 52 行的 API 呼叫從未執行。要驗證需先注入金鑰。
+
+附帶事實：`mcr.microsoft.com/dotnet/aspnet` 映像檔精簡到不含 `curl` 或 `wget`，
+無法直接在容器內測試對外連線。這是刻意的——攻擊面越小越好。
 
 ### 2.4 建置上下文體積
 
@@ -89,8 +100,14 @@ ASP.NET Core 的組態系統本就會讀取環境變數，設定 `YouTube__ApiKe
 
 ### 2.5 首次啟動需要建立資料庫
 
-容器首次啟動時 `mymusicbuddy.db` 不存在，需執行 `dotnet ef database update`。
-這表示需要一個 entrypoint 腳本 → **必然遭遇 CRLF 換行問題**（見設計文件階段 1）。
+容器首次啟動時 `mymusicbuddy.db` 不存在，需要建立資料庫。
+
+本節初版推論「需要 entrypoint 腳本 → 必然遭遇 CRLF 換行問題」，**該推論錯誤**：
+`dotnet ef` 是 SDK 工具，而執行用的 `aspnet` 映像檔沒有 SDK，腳本反而會失敗。
+實作採用 `Program.cs` 啟動時呼叫 `Database.Migrate()`，不需要任何腳本，
+因此 CRLF 問題在本專案並未實際發生。
+
+`.gitattributes` 仍予保留，作為往後任何 `.sh` 的預防措施。
 
 ---
 

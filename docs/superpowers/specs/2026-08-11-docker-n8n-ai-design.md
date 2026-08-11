@@ -242,16 +242,33 @@ Windows 用 `\r\n`，Linux 用 `\n`，容器內是 Linux。文件檔無影響，
 - `wwwroot/uploads/` 的測試照片全數進入（`PROGRESS.md:144` 記載該處累積了孤兒檔）
 - `.git/` 完整歷史進入映像檔
 
-**驗收**（逐條檢查，不可只確認「頁面有開起來」）：
+**驗收結果（2026-08-11 完成）**
 
-1. `docker compose up` → 瀏覽器可開啟
-2. 上傳一張照片 → `docker compose down` → 再 `up` → **照片與資料庫內容仍在**
-3. **字體正確載入**（`_Layout.cshtml:12-14` 的 6 個 Google Fonts 家族）。
-   連不上時不會報錯，只會靜默 fallback 成系統字體，InWave 視覺走樣
-4. **作品頁播放器出現**（`Details.cshtml:81` 載入 YouTube IFrame API）
-5. **歌單日期正確**（驗證 `TZ` 生效，非 UTC 日期）
+| # | 條件 | 結果 |
+|---|---|---|
+| 1 | `docker compose up` → 瀏覽器可開啟 | ✅ `/`、`/Works`、`/Works/Create` 皆回 200 |
+| 2 | 資料經容器重建後仍在 | ✅ 容器被 down、改名、重建，`docker-data/mymusicbuddy.db` 內容不變 |
+| 3 | 作品頁播放器出現 | ✅ 使用者實測通過 |
+| 4 | 歌單日期正確（`TZ` 生效） | ✅ 容器時鐘為 CST 且與主機一致；使用者實測日期正確 |
+| 5 | 字體載入 | — 使用者決定之後更換字體，不列入本階段驗收 |
 
-**學習重點**：映像檔、埠對應、volume、環境變數、容器的外部網路依賴。
+**驗收條件的一處更正**：初版把「字體正確載入」列為容器驗收項，該歸類錯誤。
+Google Fonts 與 YouTube IFrame API 都由**瀏覽器**下載，容器只是送出含有
+`<link>` / `<script>` 的 HTML。容器就算沒有對外網路，這兩項照樣運作。
+真正的容器對外依賴只有 `YouTubeService.cs:52` 的 YouTube Data API，
+且因容器未設金鑰而尚未驗證。詳見掃描報告 §2.3。
+
+**實作與原規劃的兩處差異**
+
+1. **未使用 entrypoint 腳本**：原規劃以腳本執行 `dotnet ef database update`，
+   但 `dotnet ef` 是 SDK 工具，`aspnet` 執行映像檔沒有。改為 `Program.cs`
+   啟動時呼叫 `Database.Migrate()`。因此 CRLF 問題並未實際發生
+   （`.gitattributes` 仍保留作為預防）。
+2. **對外埠為 5121 而非 5120**：5120 是 `launchSettings.json` 本機偵錯用的埠，
+   兩者相同會導致容器開著就無法 F5。
+
+**學習重點**：映像檔、兩階段建置與快取分層、埠對應與衝突、volume、環境變數、
+以及「瀏覽器端依賴」與「容器端依賴」的區別。
 
 ### 階段 2 — n8n 納入同一個 compose（半天）
 

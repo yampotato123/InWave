@@ -1,7 +1,48 @@
 # PROGRESS
 
-最後更新：2026-08-10
-遠端：https://github.com/yampotato123/InWave（**私有**）　分支 `main`　最新 commit `abdb41c`
+最後更新：2026-08-11
+遠端：https://github.com/yampotato123/InWave（**私有**）　分支 `main`　最新 commit `30a8bcd`
+
+---
+
+## 更新（2026-08-11）：專案更名 InWave、完成容器化
+
+### 更名 MyMusicBuddy → InWave（commit `64be6de`）
+
+讓程式碼追上 repo 名稱與 InWave 視覺改版。命名空間、專案檔、Dockerfile、
+compose、`_Layout` 的 scoped CSS 打包檔（現為 `InWave.styles.css`）皆已更新。
+
+**刻意不改**：`mymusicbuddy.db` 檔名（改了要一併處理連線字串與既有資料，無實益）；
+`docs/superpowers/specs/` 下的設計文件（那是特定時間點的記錄）。
+
+### 容器化（commit `4a47051`、`30a8bcd`）
+
+新增 `Dockerfile`（兩階段建置，映像檔 428MB）、`docker-compose.yml`、
+`.dockerignore`、`.gitattributes`。
+
+`Program.cs` 兩處改動：啟動時 `Database.Migrate()` 自動建資料庫；
+容器內跳過 `UseHttpsRedirection`。
+
+| 項目 | 值 |
+|---|---|
+| 本機偵錯（F5） | http://localhost:5120 |
+| 容器 | http://localhost:5121 |
+| 容器資料庫 | `docker-data/mymusicbuddy.db`（與本機那份各自獨立） |
+| 容器照片 | 沿用 `wwwroot/uploads/` |
+
+**驗證**：build 0 警告 0 錯誤；test 18/18；三個端點皆 200；
+容器經 down／改名／重建後資料完整；日期與播放器經使用者實測正確。
+
+### 相關文件
+
+- `docs/superpowers/specs/2026-08-11-docker-n8n-ai-design.md` — 五階段設計
+- `docs/superpowers/specs/2026-08-11-codebase-survey.md` — 全專案掃描報告
+
+### 下一步：階段 2，把 n8n 收編進同一個 compose
+
+現行 n8n 來自 `C:\Users\admin\source\repos\n8n0807`。
+搬移時**必須以該處的 `n8n_storage` 為準**——
+`C:\Users\admin\source\repos\Docker\n8n\n8n_storage` 是 2026-08-10 的舊快照。
 
 ---
 
@@ -177,6 +218,20 @@ Phase 1 已驗證完成，所以視覺這輪可以放手做。
    帶 cookie 的 fetch 被擴充功能封鎖。`DesignSync` 的 `list_files` / `get_file` 一次就成功。
    通則：瀏覽器自動化碰不到瀏覽器 chrome 與作業系統對話框（下載提示、另存新檔），
    卡在那裡就換路，不要一直重試。
+6. **容器與本機偵錯搶同一個埠**（2026-08-11）：compose 一開始也綁 5120，
+   結果容器只要開著，按 F5 就噴
+   `System.IO.IOException: Failed to bind to address http://[::1]:5120: address already in use`。
+   錯誤訊息完全不會提到 Docker。容器改綁 5121，兩邊才能同時跑。
+   **通則：容器對外的埠不要跟 `launchSettings.json` 相同。**
+7. **Windows 不分大小寫，`./data` 會撞到 `Data\`**（2026-08-11）：
+   volume 主機路徑原本寫 `./data`，Windows 直接解析成既有的 `Data\` 原始碼資料夾，
+   SQLite 就被掛進了放 `AppDbContext.cs` 的地方。Linux 上不會發生，
+   所以在別人機器或 CI 上測不出來。已改名為 `docker-data`。
+8. **`backup-before-inwave-*` 一直在被編譯**（2026-08-11 更名時才發現）：
+   備份資料夾位於專案內，Web SDK 會遞迴收錄並把其中的 `.cshtml` 交給 Razor 產生器。
+   更名前因命名空間相同而沒爆，更名後才現形。已在 `InWave.csproj` 加上
+   與 `InWave.Tests` 相同的 `Compile/Content/None Remove`。
+   **通則：放在專案資料夾內的備份，Web SDK 都會當成原始碼。**
 
 ## 驗證腳本（目前在暫存區，未進版控）
 
@@ -207,3 +262,21 @@ dotnet run --launch-profile https
 **不需要安裝或啟動任何資料庫服務**——SQLite 隨 NuGet 套件編進程式，
 整個資料庫就是 `mymusicbuddy.db` 一個檔案。備份＝複製它，重來＝刪掉它再 `database update`。
 想用眼睛看資料：DB Browser for SQLite（已安裝）。
+
+### 用容器跑（2026-08-11 起）
+
+```powershell
+cd C:\Users\admin\source\repos\InWave
+docker compose up -d --build     # 首次或改過程式碼
+docker compose logs -f           # 看 log
+docker compose down              # 停掉
+```
+
+開 http://localhost:5121
+
+- **容器與本機可以同時跑**，埠不同（本機 5120／容器 5121），資料庫也各自獨立
+- 容器的資料庫在 `docker-data/mymusicbuddy.db`，**不是**根目錄那份
+- 容器首次啟動會自動套用 migration，不必手動 `dotnet ef database update`
+- 照片兩邊共用 `wwwroot/uploads/`
+- 要接真的 YouTube 搜尋：在根目錄建 `.env` 寫 `YOUTUBE_API_KEY=你的金鑰`
+  （`.gitignore` 已擋，不會進版控）。沒設就回 `[示範]` 資料
