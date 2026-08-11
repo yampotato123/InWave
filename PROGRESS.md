@@ -1,7 +1,7 @@
 # PROGRESS
 
-最後更新：2026-08-11
-遠端：https://github.com/yampotato123/InWave（**私有**）　分支 `main`　最新 commit `d8a89ec`
+最後更新：2026-08-12
+遠端：https://github.com/yampotato123/InWave（**私有**）　分支 `main`　最新 commit `e761083`
 
 ---
 
@@ -266,6 +266,106 @@ Phase 1 已驗證完成，所以視覺這輪可以放手做。
 - **儲存真的變貴** —— 幾十萬使用者，或每人存幾萬首歌
 
 屆時該重新設計的是**整個產品形態**，不只是金鑰歸屬。
+
+---
+
+## 🔻 交接：新 session 從這裡接手（2026-08-12）
+
+### 現在在哪
+
+| 階段 | 狀態 |
+|---|---|
+| 0　基準線 | ✅ 使用者自行驗過 |
+| 1　容器化 InWave | ✅ 完成 |
+| 2　n8n 納入同一個 compose | ✅ 完成 |
+| **Spike　驗證 AI 路徑** | ✅ **完成，且推翻了原始設計** |
+| **3　AI 判讀接進 InWave** | ⬜ **未開始 ← 下一步** |
+| 4　AI 風格濾鏡（選配） | ⬜ 未開始 |
+
+### 開場先讀這三份（依序）
+
+1. `docs/superpowers/specs/2026-08-11-docker-n8n-ai-design.md` — 設計與 spike 全部結論
+2. 本檔的「資安檢查」與「已知限制」兩節
+3. `README.md` 開頭的架構與決策（面試用，寫給評估者看的）
+
+**不要重新設計**——spike 已經把「AI 產關鍵字 → YouTube 搜」推翻為
+「AI 直接推薦歌曲 → YouTube 找影片」，理由與實測數據都在設計文件 §3.1.1。
+
+### 環境狀態
+
+```
+git       main 與 origin 同步,工作區乾淨
+建置      0 警告 0 錯誤;測試 18/18
+容器      inwave 127.0.0.1:5121 / n8n 0.0.0.0:5678,皆執行中
+金鑰      YouTube:ApiKey 已設於 user-secrets;Gemini 金鑰在 n8n 憑證內
+配額      YouTube 昨日用掉 1,100/10,000 單位(每日重置)
+```
+
+### 階段 3 的執行計畫（已與使用者討論，**尚未取得最終確認**）
+
+順序的理由：每一步結束都是可驗證狀態，且**持久化要早做**——
+否則開發期間每次重新整理都在付費呼叫 AI。
+
+**步驟 1　n8n 工作流**（不碰程式碼）
+`[Webhook] → [Gemini 分析圖片] → [回應 Webhook]`
+驗收：用 PowerShell 直接打 webhook，丟 base64 照片，拿到 JSON。
+先獨立驗證 n8n 端，之後 C# 出問題才好定位。
+
+**步驟 2　C# 打得到 n8n**（只驗管線，不改行為）
+新增 `IRecommendService`，照 `Program.cs:13` 的 typed client 模式註冊。
+`Recommend` 呼叫它並**寫進 log**，推薦邏輯維持原樣。
+驗收：`docker logs inwave` 看得到 AI 回傳的 JSON。
+此步只驗「容器內的 C# 能否以 `http://n8n:5678` 連到隔壁容器」。
+
+**步驟 3　持久化**（一次 migration）
+新增 `PhotoAnalysis` 實體，與 `Photo` 一對一：
+`PhotoId` / `RawJson` / `Scene` / `AnalyzedAt` / `ModelUsed`
+`Recommend` 先查是否已分析過，有則直接使用，不再呼叫 AI。
+驗收：跑一次 → 重新整理 → n8n 執行歷史只有一筆。
+
+**步驟 4　YouTube 改以歌名搜尋**
+`YouTubeService` 新增方法：給「歌手 + 歌名」回一支影片。
+```
+1. 先查 Songs 資料表 → 命中則零配額
+2. 未命中才打 API,maxResults=5
+3. 挑選順序:「- Topic」頻道 > 頻道名含歌手名 > 其他
+4. 過濾 liveBroadcastContent != "none"
+5. 存進 Songs 表
+```
+
+**步驟 5　Fallback 與測試**
+n8n 掛掉／逾時／格式錯 → 回落 `MoodKeywordMapper` 並寫 log。
+驗收：停掉 n8n 容器，功能仍可用；現有 18 項測試全綠。
+
+### 兩個待使用者決定
+
+1. **`PhotoAnalysis` 存原始 JSON 還是拆成欄位？**
+   建議：存原始 JSON + 少數常用欄位（Scene / AnalyzedAt / ModelUsed）。
+   理由：AI 回傳格式之後還會改，存原文最有彈性；真要查詢再拆。
+2. **今天做到哪裡**（步驟 1–3 約為一日的量）。
+
+### n8n webhook 的介面契約（暫定，實作時確認）
+
+請求：
+```json
+{ "imageBase64": "...", "mimeType": "image/jpeg",
+  "mood": "午後", "filter": "冷夜",
+  "sliders": { "brightness": 100, "contrast": 100, "saturation": 100 },
+  "style": "default" }
+```
+回應：
+```json
+{ "scene": "...", "mood": ["..."], "keywords": ["..."],
+  "songs": [{ "artist": "...", "title": "...", "why": "..." }] }
+```
+
+`style` 目前只有 `default`，是為「多種推薦人格」預留的接縫——
+即使只有一個值也要帶，見設計文件 §3.5.1。
+
+### 使用中的 prompt（v3，已驗證）
+
+完整版在設計文件與 `notes/2026-08-11-spike-AI推薦流程.md` §五。
+**不要重寫**——六條規則各自解決一個實測發現的問題。
 
 ---
 
