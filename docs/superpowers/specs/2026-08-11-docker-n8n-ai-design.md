@@ -195,12 +195,46 @@ YouTube 退居為「找到這首歌的影片」，不再負責挑歌。
    `snippet.liveBroadcastContent != "none"`（值為 `none` / `live` / `upcoming`）。
 2. **排除長合輯**：查詢加 `videoDuration=short`（4 分鐘以下）或 `medium`（4–20 分鐘）。
 
-#### 尚未驗證
+#### 實際 API 驗證結果（2026-08-11 補完）
 
-- 全程以 YouTube **網站**人工搜尋驗證。對「這首歌是否存在」有效，
-  但 `type=video` + `videoCategoryId=10` 兩個過濾條件是否會誤殺某些歌，
-  **需實際 API 金鑰才能確認**（金鑰尚未申請）。
-- 歌曲存在性為抽查，非五首全驗。幻覺率未量化。
+以實際金鑰對 11 首 AI 推薦歌曲執行查詢，參數與 `YouTubeService.cs:52` 完全相同
+（`type=video` + `videoCategoryId=10` + `maxResults=1`）：
+
+| 項目 | 結果 |
+|---|---|
+| 命中率 | **11 / 11**——兩個過濾條件未誤殺任何一首 |
+| `liveBroadcastContent` | **全部為 `none`**——無任何直播混入 |
+
+**推論一：用歌名搜尋，直播問題自然消失。** 原規劃的「程式端過濾
+`liveBroadcastContent != none`」由必需降為保險——仍應實作，但不是關鍵路徑。
+（直播問題只在搜「氣氛關鍵字」時嚴重。）
+
+**推論二：約一半結果來自他人轉載，非官方上傳。**
+
+| 官方／廠牌／Topic 頻道（6） | 他人轉載（5） |
+|---|---|
+| Sub Pop、RADWIMPS、Damien Rice、The Midnight、DEPAPEPE - Topic、djhyperuk | otherwisepandemonium、BangersOnly、l onderwater、BELLA PING MUSIC CHANNEL、Fine Folk Music |
+
+轉載影片的三個風險：**會被下架**（使用者存的歌單日後變成失效連結）、
+**可能禁止嵌入**（`Details.cshtml` 的 iframe 放不出來）、音質參差。
+
+**因應（階段 3 應實作）**：配額按呼叫次數計算，與 `maxResults` 無關，
+故將 `maxResults` 提高至 5，並依下列順序挑選：
+
+```
+1. channelTitle 以「- Topic」結尾   ← YouTube 自動生成的官方音源,最穩定
+2. channelTitle 包含歌手名          ← 歌手／廠牌自有頻道
+3. 其他                             ← 轉載,最後備選
+```
+
+`- Topic` 頻道是唱片公司經發行商自動產生的官方音源，不會下架也不禁止嵌入。
+
+#### 仍未驗證
+
+- 歌曲存在性已由 API 全數確認，但**幻覺率未量化**——本次 11 首恰好全部存在，
+  樣本太小，不能推論模型不會編造。
+- **嵌入播放權限未驗證**。`search.list` 不回傳 `status.embeddable`，
+  需另呼叫 `videos.list`（額外配額）。轉載影片可能查得到卻放不出來。
 
 ### 3.2 AI 判讀的輸入：原圖 + 使用者選擇（文字）
 
