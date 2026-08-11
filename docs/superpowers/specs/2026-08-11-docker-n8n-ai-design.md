@@ -18,6 +18,51 @@ MyMusicBuddy 目前是「使用者手選情緒 + 濾鏡 → 規則查表 → 關
 
 兩者在這輪合併進行，因為 AI 判讀放在 n8n 裡執行，剛好同時服務兩個目標。
 
+### 1.1 現行設計的優點與核心缺口
+
+本節記錄現行推薦機制實際上做到什麼、沒做到什麼，作為後續判斷的依據。
+
+#### 工程上確實做得好的部分
+
+| 優點 | 證據 |
+|---|---|
+| **單一來源** | `PhotoFilters` 同時供應 CSS 字串與搜尋修飾詞，`Edit.cshtml:12` 由伺服器序列化給前端，前後端不可能走鐘 |
+| **確定性、可測試** | `GetKeyword` 是純函式，因此 18 項測試能斷言具體字串而非 not-null |
+| **零成本、零延遲** | 修圖全在瀏覽器 canvas 完成（`Edit.cshtml:114`），拖滑桿即時重繪 |
+| **配額有被認真對待** | `SearchCache` 7 天快取，因應 YouTube 一天 100 次搜尋的限制 |
+
+這些是真實的工程品質，與功能設計是否理想無關，**不應在後續改動中被破壞**。
+
+#### 核心缺口：照片沒有參與推薦
+
+現行推薦的完整輸入只有兩項，皆為使用者手動選擇：
+
+```
+MoodKeywordMapper.GetKeyword(
+    photo.Mood.MoodName,        // 8 種情緒,使用者在 Create 頁手選
+    photo.Edit?.FilterName)     // 3 種濾鏡 + 不套用,使用者在 Edit 頁手選
+```
+
+**照片的像素從未進入計算。** 換掉照片、其餘不變，推薦結果完全相同。
+
+由此推得兩個後果：
+
+1. **輸出空間固定為 32 種字串**（8 情緒 × 4 濾鏡狀態）。
+   兩張完全不同的照片，只要情緒與濾鏡相同，就得到一模一樣的歌單。
+2. **濾鏡與音樂的關聯是任意指定的**。「暖陽 → warm」「冷夜 → night」
+   是定義出來的對應，不是從照片內容導出的。
+
+`PROGRESS.md:101-103` 已指出視覺層面的同一個問題——
+「產品命題在畫面上完全不見，看起來像剛好有圖片的音樂播放器」。
+**同樣的批評也適用於推薦邏輯，且尚未被記錄。**
+
+#### 因此 AI 判讀的定位
+
+AI 判讀**不是加分功能，是補上產品命題的缺口**：讓照片真正參與推薦。
+
+這也決定了取捨的優先序——若時間不足必須砍功能，
+應優先保留「照片影響推薦」這條路徑，而非 AI 生圖等視覺加值。
+
 ---
 
 ## 2. 目標與非目標
@@ -144,20 +189,69 @@ dotnet run --launch-profile https
 
 ### 階段 1 — MyMusicBuddy 容器化（1–1.5 天）
 
-撰寫 `Dockerfile`（多階段建置：SDK 編譯 → runtime 執行）與 `docker-compose.yml`。
+撰寫 `Dockerfile`（多階段建置：SDK 編譯 → runtime 執行）、`.dockerignore`、
+`.gitattributes` 與 `docker-compose.yml`。
 
-預期會遭遇的三個問題（皆為既有程式碼與容器環境的真實衝突）：
+預期會遭遇的五個問題（皆為既有環境與容器環境的真實衝突）：
 
 | 問題 | 位置 | 處理方向 |
 |---|---|---|
 | `UseHttpsRedirection` 在僅開放 http 的容器中造成轉址失敗 | `Program.cs:23` | 容器內走 http，轉址交由外層處理 |
-| User Secrets 在容器中不存在，YouTube 金鑰讀不到 | `.csproj:7` | 改用環境變數注入 |
+| User Secrets 在容器中不存在，YouTube 金鑰讀不到 | `YouTubeService.cs:44` | 注入環境變數 `YouTube__ApiKey`，**零程式碼改動**（見下） |
 | `mymusicbuddy.db` 與 `wwwroot/uploads/` 隨容器刪除而消失 | `PROGRESS.md:154` | 掛載 volume |
+| **CRLF 換行導致容器內腳本無法執行** | Windows 開發環境 | `.gitattributes` 指定 `*.sh text eol=lf` |
+| **建置上下文夾帶不該進映像檔的檔案** | 專案根目錄 | `.dockerignore` |
+| **容器時區為 UTC，日期顯示錯誤** | 三處，見下 | compose 設定 `TZ=Asia/Taipei` |
 
-**驗收**：`docker compose up` → 瀏覽器可開啟 → 上傳一張照片 →
-`docker compose down` 後再 `up` → **照片與資料庫內容仍在**。
+#### 時區依賴的三個位置
 
-**學習重點**：映像檔、埠對應、volume、環境變數。
+容器預設 UTC，台北為 UTC+8。以下三處會取到錯誤日期，且**不會報錯**：
+
+| 位置 | 程式碼 | 影響 |
+|---|---|---|
+| `WorksController.cs:208` | `DateTime.Now:MM/dd` | 歌單預設名稱 |
+| `Views/Works/Index.cshtml`（2 處） | `CreatedAt.ToLocalTime()` | 收藏櫃書背與作品資訊 |
+| `Views/Works/Details.cshtml:17` | `CreatedAt.ToLocalTime()` | 作品頁日期 |
+
+台北時間晚上 8 點之後建立的作品會顯示為前一天。
+
+#### YouTube 金鑰：零程式碼改動（掃描後修正）
+
+`YouTubeService.cs:44` 使用 `_config["YouTube:ApiKey"]`。ASP.NET Core 的組態系統
+本就會讀取環境變數，設定 `YouTube__ApiKey`（雙底線對應冒號）即可生效。
+本文件初版將此列為需處理項目，掃描後確認**只需在 compose 注入環境變數**。
+
+#### 換行字元（教學重點）
+
+Windows 用 `\r\n`，Linux 用 `\n`，容器內是 Linux。文件檔無影響，但腳本檔會失敗：
+`#!/bin/sh\r` 會被當成要尋找名為 `/bin/sh\r` 的直譯器，錯誤訊息為
+`bad interpreter: No such file or directory`，或更難解讀的
+`exec ./entrypoint.sh: no such file or directory`——檔案存在卻報找不到，
+實際找不到的是直譯器而非腳本。
+
+本輪幾乎確定會寫啟動腳本（容器首次啟動時資料庫尚不存在，需先執行
+`dotnet ef database update`），因此此問題必然遭遇，不是假設性風險。
+
+#### `.dockerignore`（教學重點）
+
+概念類似 `.gitignore`，但目的不同：前者決定哪些檔案進入**建置上下文**，後者決定哪些進入**版控**。
+兩者內容常相似而易被混為一談。未設定時的具體後果：
+
+- `bin/`、`obj/` 被打包 → 映像檔膨脹，且內含 Windows 編譯產物，與容器內 Linux 執行環境不符
+- `mymusicbuddy.db` 被烤進映像檔 → 與掛載的 volume 相互覆蓋，出現「資料時有時無」的難解現象
+- `wwwroot/uploads/` 的測試照片全數進入（`PROGRESS.md:144` 記載該處累積了孤兒檔）
+- `.git/` 完整歷史進入映像檔
+
+**驗收**（逐條檢查，不可只確認「頁面有開起來」）：
+
+1. `docker compose up` → 瀏覽器可開啟
+2. 上傳一張照片 → `docker compose down` → 再 `up` → **照片與資料庫內容仍在**
+3. **字體正確載入**（`_Layout.cshtml:12-14` 的 6 個 Google Fonts 家族）。
+   連不上時不會報錯，只會靜默 fallback 成系統字體，InWave 視覺走樣
+4. **作品頁播放器出現**（`Details.cshtml:81` 載入 YouTube IFrame API）
+5. **歌單日期正確**（驗證 `TZ` 生效，非 UTC 日期）
+
+**學習重點**：映像檔、埠對應、volume、環境變數、容器的外部網路依賴。
 
 ### 階段 2 — n8n 納入同一個 compose（半天）
 
@@ -181,20 +275,69 @@ dotnet run --launch-profile https
 **C# 側**：新增 `IRecommendService`（照 `Program.cs:13` 的 typed client 模式），
 於「確認」動作中呼叫。失敗時依 §3.5 回落。
 
+**必須一併處理：AI 結果要持久化（掃描後新增）**
+
+`Recommend` 是 GET action（`WorksController.cs:190`）。使用者按 F5、返回上一頁
+或開啟書籤都會重新執行第 199 行。現況無害（`MoodKeywordMapper` 是純函式），
+但 AI 接上後**每次重新整理都是一次付費呼叫**。
+
+`SearchCache` 涵蓋不到這個問題——快取查詢在 `YouTubeService.cs:30-39`，以關鍵字為鍵，
+而 AI 位於「產生關鍵字」之前：
+
+```
+WorksController.cs:199   AI 呼叫      ← 無任何快取
+WorksController.cs:200   YouTube 搜尋  ← 有 7 天快取
+```
+
+處置：AI 產生的關鍵字存入資料庫（落點建議為 `MoodProfile`，該表已有
+`Energy`/`Calmness`/`Warmth`/`Exploration` 四個未使用的數值欄位），
+`Recommend` 先檢查是否已有結果。**需要一次 migration，本階段的工作量因此增加。**
+
 **驗收**：
 - 按確認 → 取得 AI 產生的關鍵字 → YouTube 有搜尋結果
+- **重新整理推薦頁，不會再次呼叫 AI**（查 n8n 執行歷史確認只有一筆）
 - 停掉 n8n 容器後功能仍可用（走 fallback），且 log 有記錄
 
 **學習重點**：n8n 工作流、容器間 HTTP 通訊、AI prompt 迭代。
 
-### 階段 4 — 主題濾鏡（選配，1 天）
+### 階段 4 — AI 風格濾鏡（選配，1–1.5 天）
 
-新增賽博朋克 / 東京 / 懷舊電影等主題濾鏡。純 C# + CSS，不涉及 Docker。
+新增賽博朋克 / 東京 / 懷舊電影等主題風格。使用者要求以 **AI 生圖**實作，
+而非疊加 CSS 圖層。
 
-定義集中於 `Services/PhotoFilters.cs`（維持單一來源，見 `README.md:67`）。
-新增濾鏡須同步補上對應測試。
+**採並存而非取代**：
 
-**排在最後的理由**：不服務本輪兩個必學項。時間不足即砍除，或僅實作一個濾鏡。
+| 種類 | 實作 | 特性 |
+|---|---|---|
+| 快速濾鏡（暖陽 / 冷夜 / 褪色） | CSS `ctx.filter` | 即時、免費、微調用。**完全不動** |
+| AI 風格（賽博朋克 / 東京 / …） | n8n 生圖工作流 | 按鈕觸發、約 10 秒、換掉來源圖 |
+
+流程：按「套用 AI 風格」→ 送原圖給 n8n → 生圖回傳 →
+**成為新的 `<img id="source">`** → 滑桿與 CSS 濾鏡繼續在其上即時作用。
+
+如此現行的即時預覽機制（`Edit.cshtml:106-124`）完全保留，AI 是附加而非替換。
+
+**已知代價（掃描後確認）**：
+
+1. **兩項既有測試會失敗**，且它們是刻意的設計約束，不是疏漏：
+
+   | 測試 | 斷言 |
+   |---|---|
+   | `PhotoFiltersTests.恰好三種濾鏡()` | `PhotoFilters.All.Length == 3` |
+   | `PhotoFiltersTests.每種濾鏡都有css字串與搜尋修飾詞()` | 每個濾鏡的 `CssFilter` 非空 |
+
+   AI 風格沒有 CSS 字串。若將兩類濾鏡放進同一個 `PhotoFilters.All`，
+   第二項必然失敗。建議分成兩個集合，讓既有測試維持有效。
+
+2. **命名衝突**：擬新增的「懷舊電影」與既有情緒「懷舊」不是相同字串，
+   `PhotoFiltersTests.濾鏡名稱不得與情緒名稱重疊()` 會通過，
+   但這正是該測試想防止的混淆情境。命名需另行斟酌。
+
+3. **成本**：每次生圖約 US$0.01–0.05，且「重修」是既有的預期行為（`README.md:71`）。
+   須限制為明確按鈕觸發，不可隨滑桿變動觸發。
+
+**排在最後的理由**：不服務本輪兩個必學項（Docker、n8n 基礎）。
+時間不足即砍除。砍除不影響階段 1–3。
 
 ### 砍除順序
 
