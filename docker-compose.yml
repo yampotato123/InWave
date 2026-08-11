@@ -81,6 +81,21 @@ services:
       # 前面隔了 Tailscale serve 一層反向代理,要讓 n8n 正確判讀來源 IP
       - N8N_PROXY_HOPS=1
 
+      # 允許讀檔節點存取 /files。
+      #
+      # n8n 2.x 預設 N8N_RESTRICT_FILE_ACCESS_TO='~/.n8n-files',只開放那一個
+      # 資料夾;不設這個的話,讀 /files/xxx.jpg 會噴
+      # "Access to the file is not allowed."
+      #
+      # 這是刻意的安全機制:讀檔節點若不限制,任何人在 n8n 裡建一條工作流就能讀
+      # /etc/passwd 或 n8n 自己的 database.sqlite(裡面有全部 API 金鑰)。
+      # 這裡只開放 /files,其餘照舊擋著;多個路徑用分號 ; 分隔。
+      #
+      # 另外兩道預設防線維持開啟,不要關:
+      #   N8N_BLOCK_FILE_ACCESS_TO_N8N_FILES=true  禁止碰 n8n 自己的憑證資料庫
+      #   N8N_BLOCK_FILE_PATTERNS='\.git'          禁止碰 .git 目錄
+      - N8N_RESTRICT_FILE_ACCESS_TO=/files
+
     volumes:
       # 資料來源:2026-08-11 從 C:\Users\admin\source\repos\n8n0807 複製而來
       # (不是 Docker\n8n 那份 8/10 舊快照)。原資料夾保留未動,可當後路。
