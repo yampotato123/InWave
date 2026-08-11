@@ -489,3 +489,6 @@ wwwroot/uploads/*
 *.db
 *.db-shm
 *.db-wal
+
+# 個人複習筆記,不進版控(與 DesignFestivo 的 notes\ 同一套規矩)
+notes/
