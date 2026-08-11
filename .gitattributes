@@ -1,0 +1,25 @@
+# 換行字元規則。
+#
+# 為什麼需要這個檔:Windows 用 CRLF(\r\n),Linux 用 LF(\n),而容器裡是 Linux。
+# 腳本檔若帶著 \r 進容器,第一行 `#!/bin/sh` 會變成 `#!/bin/sh\r`,
+# Linux 會去找一個名為 `/bin/sh\r` 的直譯器,找不到,報
+# `bad interpreter: No such file or directory`,
+# 或更難解讀的 `exec ./xxx.sh: no such file or directory`
+# ——檔案明明存在卻說找不到,因為找不到的是直譯器而非腳本。
+#
+# 注意:git 倉庫裡存的是 LF 不代表安全。docker build 讀的是「工作區的檔案」,
+# 而工作區在 Windows 上是 CRLF。所以要用 eol=lf 強制工作區也是 LF。
+
+# 預設:git 自行判斷是否為文字檔,存進倉庫時正規化為 LF
+* text=auto
+
+# 容器內會被執行或解析的檔案,工作區也強制 LF
+*.sh   text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+Dockerfile      text eol=lf
+.dockerignore   text eol=lf
+
+# Windows 專用批次檔維持 CRLF,否則 cmd.exe 可能出錯
+*.bat text eol=crlf
+*.cmd text eol=crlf

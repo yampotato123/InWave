@@ -1,0 +1,42 @@
+services:
+  mymusicbuddy:
+    build: .
+    container_name: mymusicbuddy
+    restart: unless-stopped
+
+    # 左邊是你電腦上的埠,右邊是容器裡的埠。
+    # 容器裡是 8080(Dockerfile 的 ASPNETCORE_HTTP_PORTS),
+    # 對外用 5120 是為了跟你本機 dotnet run 的習慣一致。
+    ports:
+      - "5120:8080"
+
+    environment:
+      # 容器預設時區是 UTC,不設這個的話台北晚上 8 點後建立的作品
+      # 日期會顯示成前一天。受影響的有三處:
+      #   WorksController.cs:208 的 DateTime.Now
+      #   Views/Works/Index.cshtml 的 ToLocalTime()(兩處)
+      #   Views/Works/Details.cshtml:17 的 ToLocalTime()
+      - TZ=Asia/Taipei
+
+      # Production 環境下 Program.cs:17 的 if 會成立,啟用
+      # UseExceptionHandler 與 UseHsts。要看詳細錯誤頁時改成 Development。
+      - ASPNETCORE_ENVIRONMENT=Production
+
+      # 資料庫檔案放在 /app/docker-data,由下面的 volume 掛到你的硬碟。
+      # 冒號在環境變數裡要寫成雙底線:ConnectionStrings:DefaultConnection
+      - ConnectionStrings__DefaultConnection=Data Source=/app/docker-data/mymusicbuddy.db
+
+      # YouTube 金鑰。User Secrets 在容器裡不存在,改用環境變數。
+      # ASP.NET Core 的組態系統本來就會讀環境變數,不需要改任何程式碼。
+      # 值放在同目錄的 .env 檔(已被 .gitignore 擋住,不會進版控)。
+      - YouTube__ApiKey=${YOUTUBE_API_KEY:-}
+
+    volumes:
+      # 容器刪掉重建時,這兩個目錄的內容要留下來。
+      # 冒號左邊是你硬碟上的路徑,右邊是容器裡的路徑。
+      #
+      # 注意路徑不要取名 ./data —— Windows 檔案系統不分大小寫,
+      # 那會撞到專案既有的 Data\ 原始碼資料夾(AppDbContext.cs 在裡面),
+      # 結果是把資料庫掛進原始碼目錄。Linux 上不會發生,所以很難事後發現。
+      - ./docker-data:/app/docker-data          # SQLite 資料庫
+      - ./wwwroot/uploads:/app/wwwroot/uploads  # 使用者上傳的照片

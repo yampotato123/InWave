@@ -1,0 +1,43 @@
+# 建置上下文排除清單。
+#
+# 與 .gitignore 目的不同,不要混為一談:
+#   .gitignore    決定什麼進「版控」
+#   .dockerignore 決定什麼進「docker build 的建置上下文」
+# 一個檔案可能該進版控但不該進映像檔(例如 docs/),反之亦然。
+
+# --- 建置產物 ---
+# 這些是 Windows 上編出來的,與容器內的 Linux 執行環境不相容,
+# 且會讓建置上下文膨脹好幾倍。容器內會自己重新編譯。
+**/bin/
+**/obj/
+
+# --- 版控與 IDE ---
+.git/
+.gitignore
+.gitattributes
+.vs/
+*.user
+
+# --- 資料:一定要排除 ---
+# 資料庫與使用者上傳的照片由 volume 提供。若烤進映像檔,
+# 會與掛載上來的 volume 互相覆蓋,出現「資料時有時無」的難解現象。
+mymusicbuddy.db
+mymusicbuddy.db-shm
+mymusicbuddy.db-wal
+wwwroot/uploads/
+docker-data/
+
+# --- 舊設計備份 ---
+# InWave 改版前的整份舊 View 與 CSS,執行期完全用不到。
+backup-before-inwave-*/
+
+# --- 文件與測試 ---
+# 執行期不需要。測試在 CI 或本機跑,不進執行用映像檔。
+docs/
+*.md
+MyMusicBuddy.Tests/
+
+# --- Docker 自身 ---
+Dockerfile
+.dockerignore
+docker-compose*.yml
