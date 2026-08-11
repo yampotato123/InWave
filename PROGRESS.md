@@ -44,7 +44,7 @@
 從 SQL Server LocalDB 換成 SQLite。原因：LocalDB 不是上架選項，沒有主機平台會跑它；
 換掉之後 clone 下來即可執行，不必安裝或啟動任何資料庫服務。
 
-- `MyMusicBuddy.csproj`：`EntityFrameworkCore.SqlServer` → `EntityFrameworkCore.Sqlite`
+- `InWave.csproj`：`EntityFrameworkCore.SqlServer` → `EntityFrameworkCore.Sqlite`
 - `Program.cs`：`UseSqlServer` → `UseSqlite`
 - `appsettings.json`：連線字串 → `Data Source=mymusicbuddy.db`
 - 舊 migration 是純 SQL Server 產物，刪除後重生為 SQLite 版本
@@ -72,9 +72,9 @@ SQLite < 3.50.2，有 CVE-2025-6965（CVSS 7.2，聚合函式記憶體損毀）�
 
 ### Phase 1 附帶（commit `16cd2a8`、`0f4f5c9`）
 
-- `MyMusicBuddy.Tests`：xUnit，18 項測試（情緒 × 濾鏡的所有組合、fallback、濾鏡定義約束）
+- `InWave.Tests`：xUnit，18 項測試（情緒 × 濾鏡的所有組合、fallback、濾鏡定義約束）
 - `docs/superpowers/specs/2026-08-06-photo-editor-design.md`：設計文件
-- `MyMusicBuddy.slnx`：方案檔，讓 Visual Studio 18 的測試總管看得到測試專案
+- `InWave.slnx`：方案檔，讓 Visual Studio 18 的測試總管看得到測試專案
 - README 更新：建置說明、修圖頁流程、常見問題
 
 ### 驗證結果
@@ -194,7 +194,7 @@ Phase 1 已驗證完成，所以視覺這輪可以放手做。
 ## 怎麼把環境跑起來
 
 ```powershell
-cd C:\Users\admin\source\repos\MyMusicBuddy
+cd C:\Users\admin\source\repos\InWave
 dotnet build
 dotnet ef database update      # 第一次，或刪掉 .db 之後
 dotnet run --launch-profile https
@@ -202,7 +202,7 @@ dotnet run --launch-profile https
 
 開 https://localhost:7167 　（Visual Studio 按 F5 也可以，且行程由自己掌控比較穩）
 
-測試：`dotnet test MyMusicBuddy.slnx`
+測試：`dotnet test InWave.slnx`
 
 **不需要安裝或啟動任何資料庫服務**——SQLite 隨 NuGet 套件編進程式，
 整個資料庫就是 `mymusicbuddy.db` 一個檔案。備份＝複製它，重來＝刪掉它再 `database update`。

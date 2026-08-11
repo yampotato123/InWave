@@ -1,9 +1,9 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace MyMusicBuddy.Migrations
+namespace InWave.Migrations
 {
     /// <inheritdoc />
     public partial class InitialCreate : Migration

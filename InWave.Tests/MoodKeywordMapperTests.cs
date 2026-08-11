@@ -1,6 +1,6 @@
-using MyMusicBuddy.Services;
+using InWave.Services;
 
-namespace MyMusicBuddy.Tests;
+namespace InWave.Tests;
 
 /// <summary>
 /// 情緒 × 濾鏡 → YouTube 搜尋關鍵字。

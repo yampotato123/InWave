@@ -1,4 +1,4 @@
-namespace MyMusicBuddy.Services;
+namespace InWave.Services;
 
 /// <summary>YouTube 搜尋回傳的單筆結果(還沒存進 DB 的型態)。</summary>
 public record SongResult(string VideoId, string Title, string Artist, string ThumbnailUrl);

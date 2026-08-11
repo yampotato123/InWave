@@ -13,14 +13,14 @@ WORKDIR /src
 # 只有當該層的輸入改變時才重新執行。專案檔沒動的話,
 # restore 這層直接命中快取 —— 改一行 C# 不必重新下載所有 NuGet 套件。
 # 若直接 `COPY . .` 再 restore,任何一個字的改動都會讓套件重下一次。
-COPY MyMusicBuddy.csproj .
-RUN dotnet restore MyMusicBuddy.csproj
+COPY InWave.csproj .
+RUN dotnet restore InWave.csproj
 
 # 再複製其餘原始碼(哪些檔案會進來由 .dockerignore 決定)
 COPY . .
 
 # --no-restore:上一步已經 restore 過,不必再做一次
-RUN dotnet publish MyMusicBuddy.csproj -c Release -o /app/publish --no-restore
+RUN dotnet publish InWave.csproj -c Release -o /app/publish --no-restore
 
 # ============================================================
 # 第二階段:執行
@@ -44,4 +44,4 @@ EXPOSE 8080
 
 COPY --from=build /app/publish .
 
-ENTRYPOINT ["dotnet", "MyMusicBuddy.dll"]
+ENTRYPOINT ["dotnet", "InWave.dll"]

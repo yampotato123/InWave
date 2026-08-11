@@ -1,4 +1,4 @@
-namespace MyMusicBuddy.Models;
+namespace InWave.Models;
 
 /// <summary>只保存 YouTube 影片 ID、標題與縮圖網址,不下載任何音樂(企劃書第十一節)。</summary>
 public class Song

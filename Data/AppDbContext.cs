@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using MyMusicBuddy.Models;
+using InWave.Models;
 
-namespace MyMusicBuddy.Data;
+namespace InWave.Data;
 
 public class AppDbContext : DbContext
 {

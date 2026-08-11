@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
-using MyMusicBuddy.Data;
-using MyMusicBuddy.Services;
+using InWave.Data;
+using InWave.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 

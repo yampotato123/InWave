@@ -1,7 +1,9 @@
 services:
-  mymusicbuddy:
+  # 服務名稱同時也是容器之間的 DNS 名稱。
+  # 階段 2 加入 n8n 後,n8n 會用 http://inwave:8080 找到這個服務。
+  inwave:
     build: .
-    container_name: mymusicbuddy
+    container_name: inwave
     restart: unless-stopped
 
     # 左邊是你電腦上的埠,右邊是容器裡的埠。

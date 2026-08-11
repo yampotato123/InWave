@@ -1,4 +1,4 @@
-@model MyMusicBuddy.Models.Playlist
+@model InWave.Models.Playlist
 @{
     ViewData["Title"] = Model.Name;
     var songs = Model.PlaylistSongs.Select(ps => ps.Song).ToList();

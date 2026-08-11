@@ -1,8 +1,8 @@
 using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
-using MyMusicBuddy.Models;
+using InWave.Models;
 
-namespace MyMusicBuddy.Controllers;
+namespace InWave.Controllers;
 
 public class HomeController : Controller
 {

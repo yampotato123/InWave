@@ -1,4 +1,4 @@
-namespace MyMusicBuddy.Models.ViewModels;
+namespace InWave.Models.ViewModels;
 
 /// <summary>推薦頁的畫面資料:一張照片 + 情緒 + 候選歌曲清單,勾選後存成歌單。</summary>
 public class RecommendViewModel

@@ -1,11 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using MyMusicBuddy.Data;
-using MyMusicBuddy.Models;
-using MyMusicBuddy.Models.ViewModels;
-using MyMusicBuddy.Services;
+using InWave.Data;
+using InWave.Models;
+using InWave.Models.ViewModels;
+using InWave.Services;
 
-namespace MyMusicBuddy.Controllers;
+namespace InWave.Controllers;
 
 /// <summary>
 /// 作品流程:上傳照片 → 選情緒 → 推薦歌曲 → 存歌單 → 檢視作品。

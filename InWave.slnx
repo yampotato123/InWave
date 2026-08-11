@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="InWave.csproj" />
+  <Project Path="InWave.Tests/InWave.Tests.csproj" />
+</Solution>

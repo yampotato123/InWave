@@ -1,4 +1,4 @@
-namespace MyMusicBuddy.Models;
+namespace InWave.Models;
 
 public class ErrorViewModel
 {

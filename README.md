@@ -1,4 +1,4 @@
-# MyMusicBuddy
+# InWave
 
 照片情緒音樂分享平台——上傳照片、選情緒、取得 YouTube 推薦歌單。
 

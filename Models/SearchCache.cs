@@ -1,4 +1,4 @@
-namespace MyMusicBuddy.Models;
+namespace InWave.Models;
 
 /// <summary>
 /// YouTube 搜尋結果快取。

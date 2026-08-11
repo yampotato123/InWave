@@ -1,9 +1,9 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using MyMusicBuddy.Data;
-using MyMusicBuddy.Models;
+using InWave.Data;
+using InWave.Models;
 
-namespace MyMusicBuddy.Services;
+namespace InWave.Services;
 
 public class YouTubeService : IYouTubeService
 {

@@ -1,4 +1,4 @@
-namespace MyMusicBuddy.Models;
+namespace InWave.Models;
 
 /// <summary>歌單與歌曲的多對多關聯,SortOrder 決定歌曲在歌單中的順序。</summary>
 public class PlaylistSong

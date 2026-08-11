@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -9,9 +9,16 @@
 
   <ItemGroup>
     <!-- Web SDK 預設遞迴收錄所有 .cs,不排除的話測試專案會被主專案一起編譯 -->
-    <Compile Remove="MyMusicBuddy.Tests/**" />
-    <Content Remove="MyMusicBuddy.Tests/**" />
-    <None Remove="MyMusicBuddy.Tests/**" />
+    <Compile Remove="InWave.Tests/**" />
+    <Content Remove="InWave.Tests/**" />
+    <None Remove="InWave.Tests/**" />
+
+    <!-- InWave 改版前的舊 View 備份。同樣會被遞迴收錄——.cshtml 交給 Razor
+         產生器編譯,裡面的舊 @model 型別在改名後就不存在了,不排除會建置失敗。
+         (2026-08-11 改名時發現;在此之前它一直被編譯,只是命名空間剛好相同。) -->
+    <Compile Remove="backup-before-inwave-*/**" />
+    <Content Remove="backup-before-inwave-*/**" />
+    <None Remove="backup-before-inwave-*/**" />
   </ItemGroup>
 
   <ItemGroup>

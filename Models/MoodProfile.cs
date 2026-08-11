@@ -1,4 +1,4 @@
-namespace MyMusicBuddy.Models;
+namespace InWave.Models;
 
 /// <summary>一張照片的情緒設定。滑桿範圍 0–100,50 = 中間值。</summary>
 public class MoodProfile

@@ -1,4 +1,4 @@
-namespace MyMusicBuddy.Services;
+namespace InWave.Services;
 
 /// <summary>
 /// 情緒 → YouTube 搜尋關鍵字的規則對照表(企劃書第五節:初期用規則,不用 AI)。

@@ -1,4 +1,4 @@
-namespace MyMusicBuddy.Models.ViewModels;
+namespace InWave.Models.ViewModels;
 
 /// <summary>修圖頁的資料。滑桿值 100 = 原圖,範圍 0–200(與 PhotoEdit 一致)。</summary>
 public class EditViewModel

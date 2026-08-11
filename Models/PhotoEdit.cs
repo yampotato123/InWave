@@ -1,4 +1,4 @@
-namespace MyMusicBuddy.Models;
+namespace InWave.Models;
 
 /// <summary>一張照片的修圖參數。100 = 原圖,範圍 0–200。</summary>
 public class PhotoEdit

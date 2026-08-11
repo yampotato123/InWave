@@ -1,4 +1,4 @@
-namespace MyMusicBuddy.Services;
+namespace InWave.Services;
 
 /// <summary>一種修圖濾鏡。</summary>
 /// <param name="Name">顯示名稱,同時是存進 PhotoEdit.FilterName 的值</param>
