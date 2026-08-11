@@ -492,3 +492,7 @@ wwwroot/uploads/*
 
 # 個人複習筆記,不進版控(與 DesignFestivo 的 notes\ 同一套規矩)
 notes/
+
+# n8n 的資料與檔案(含 workflow、憑證),不進版控
+n8n-data/
+n8n-files/

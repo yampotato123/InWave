@@ -49,3 +49,40 @@ services:
       # 結果是把資料庫掛進原始碼目錄。Linux 上不會發生,所以很難事後發現。
       - ./docker-data:/app/docker-data          # SQLite 資料庫
       - ./wwwroot/uploads:/app/wwwroot/uploads  # 使用者上傳的照片
+
+  # n8n:工作流自動化。階段 3 會用它跑 AI 判讀照片。
+  #
+  # 同一個 compose 檔裡的服務會自動加入同一個網路,彼此可用「服務名稱」互相連線:
+  #   從 inwave 容器  → http://n8n:5678
+  #   從 n8n 容器     → http://inwave:8080
+  # 注意用的是「服務名稱 + 容器內的埠」,不是 localhost 也不是對外的 5121。
+  # 容器裡的 localhost 指的是「容器自己」,不是你的電腦。
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:2.33.5
+    container_name: n8n
+    restart: unless-stopped
+
+    # Tailscale serve 已設定把 desktop-cj8q9sn.tail02844b.ts.net 代理到
+    # 127.0.0.1:5678,所以對外埠必須維持 5678,不能改。
+    # 查目前設定:tailscale serve status
+    ports:
+      - "5678:5678"
+
+    environment:
+      - TZ=Asia/Taipei
+      - GENERIC_TIMEZONE=Asia/Taipei
+
+      # 產生編輯器網址與 webhook 網址用。給完整網址即可,
+      # 不需要 N8N_HOST / N8N_PROTOCOL(那兩個只是用來拼出這個網址)。
+      - N8N_EDITOR_BASE_URL=https://desktop-cj8q9sn.tail02844b.ts.net
+      # 舊的 WEBHOOK_URL 已被 n8n 標為淘汰,日誌會警告,改用這個
+      - N8N_WEBHOOK_URL=https://desktop-cj8q9sn.tail02844b.ts.net
+
+      # 前面隔了 Tailscale serve 一層反向代理,要讓 n8n 正確判讀來源 IP
+      - N8N_PROXY_HOPS=1
+
+    volumes:
+      # 資料來源:2026-08-11 從 C:\Users\admin\source\repos\n8n0807 複製而來
+      # (不是 Docker\n8n 那份 8/10 舊快照)。原資料夾保留未動,可當後路。
+      - ./n8n-data:/home/node/.n8n
+      - ./n8n-files:/files
