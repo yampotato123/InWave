@@ -269,6 +269,74 @@ Phase 1 已驗證完成，所以視覺這輪可以放手做。
 
 ---
 
+## 資安檢查（2026-08-11）
+
+### 通過
+
+| 檢查 | 結果 |
+|---|---|
+| 全部 commit 歷史掃 API 金鑰 | 未發現任何 `AIza...` 或 api key 字串 |
+| 敏感檔案是否進版控 | `.db`／`.env`／`n8n-data/`／`docker-data/` 皆未進版控 |
+| 套件弱點（含傳遞相依） | InWave 與 InWave.Tests **皆無** |
+| repo 權限 | 私有 |
+
+### 已修正：容器埠綁定
+
+`inwave` 原本綁 `0.0.0.0:5121`，同網段任何裝置皆可存取——**而本站沒有任何認證機制**，
+對方可上傳照片、瀏覽全部歌單、消耗 API 配額。已改為 `127.0.0.1:5121`。
+
+`n8n` 維持 `0.0.0.0:5678`（有登入保護，且需保留同網段存取）。
+註：綁 `127.0.0.1` 不會影響 Tailscale——`tailscale serve` 本來就是從本機
+連 `127.0.0.1:5678`。
+
+### ⚠️ 待處理：commit 歷史含他人公司信箱
+
+```
+jiayi.wang@qburger.com.tw
+```
+
+**這是轉公開的阻斷條件。** repo 目前私有故無立即風險，但一旦為了給人看而轉公開，
+即等同公開他人個資。
+
+**給他人看程式碼的正確做法**：維持私有，用 GitHub Collaborators 邀請
+（Settings → Collaborators → Add people）。面試亦同——說明「這是私有 repo，
+我發邀請給您」反而展現資安意識。
+
+**真的要轉公開時**：先備份整個資料夾，再用 `git filter-repo` 將該 email
+換成匿名值（commit 訊息與歷史全數保留），然後 `git push --force`。
+**不要用「開新 repo 重新 commit」的方式規避**——commit 歷史是本專案的價值之一。
+
+```powershell
+pip install git-filter-repo
+git filter-repo --email-callback '
+    return b"anonymous@example.com" if email == b"jiayi.wang@qburger.com.tw" else email
+'
+```
+
+### ℹ️ 知悉即可：n8n 憑證的存放位置
+
+`n8n-data\database.sqlite` 存放 Gemini API 金鑰（n8n 會加密），
+但**加密金鑰就在同一個資料夾的 `config` 檔**。因此：
+
+- 不要將 `n8n-data\` 同步到雲端硬碟
+- 不要壓縮整個專案資料夾傳給他人
+- 已在 `.gitignore` 中
+
+附帶好處：金鑰只存在 n8n 一處，**外洩面收斂到單一資料夾**，
+而非散落於程式碼、環境變數、設定檔各處。
+
+### ⚠️ 待處理：Tailscale 上有他人的機器
+
+```
+100.73.120.120  desktop-cj8q9sn                       tonya22406@（本人）
+100.108.168.24  bs-sqlserver2022.bigeye-wezen.ts.net  andyhuang1223@（他人）
+```
+
+若日後把**沒有認證的 InWave** 也掛上 `tailscale serve`，該機器擁有者即可存取。
+三個選項：只掛 n8n（現況，最安全）／掛上並接受對方看得到／先為 InWave 加認證再掛。
+
+---
+
 ## 已知限制（非 bug，但要知道）
 
 - **上架時照片會消失**：`WorksController.cs` 把上傳檔寫進 `wwwroot/uploads/`，
