@@ -4,7 +4,7 @@
 }
 
 <main class="iw-page" style="max-width:1080px">
-    <div class="iw-mono">Step 03 · @Model.MoodName</div>
+    <div class="iw-mono">Step 03 · @(string.IsNullOrEmpty(Model.MoodName) ? "待 AI 判讀" : Model.MoodName)</div>
     <h1 class="iw-serif" style="margin:12px 0 6px;font-size:46px;line-height:1.1">推薦歌單</h1>
     <div class="iw-mono" style="color:var(--accent);margin-bottom:34px">@Model.SearchKeyword</div>
 

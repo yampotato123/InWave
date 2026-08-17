@@ -52,6 +52,20 @@ public class MoodKeywordMapperTests
         Assert.Equal("chill music warm", MoodKeywordMapper.GetKeyword("不存在的情緒", "暖陽"));
     }
 
+    // 2026-08-17 情緒改為可不選(設計文件 §3.2.1)之後,空字串是正常的生產輸入而非錯誤。
+    // AI 尚未接上、或 n8n 掛掉走 fallback 時,整條推薦鏈都靠下面這兩條撐住。
+    [Fact]
+    public void 情緒未指定_退回預設關鍵字_而不是丟例外()
+    {
+        Assert.Equal("chill music", MoodKeywordMapper.GetKeyword(""));
+    }
+
+    [Fact]
+    public void 情緒未指定但有套濾鏡_修飾詞仍要生效()
+    {
+        Assert.Equal("chill music night", MoodKeywordMapper.GetKeyword("", "冷夜"));
+    }
+
     [Fact]
     public void 八種情緒都查得到自己的關鍵字_沒有漏掉任何一個()
     {

@@ -296,10 +296,21 @@ Phase 1 已驗證完成，所以視覺這輪可以放手做。
 ```
 git       main 與 origin 同步,工作區乾淨
 建置      0 警告 0 錯誤;測試 18/18
-容器      inwave 127.0.0.1:5121 / n8n 0.0.0.0:5678,皆執行中
+容器      inwave 127.0.0.1:5121 / n8n 0.0.0.0:5678
 金鑰      YouTube:ApiKey 已設於 user-secrets;Gemini 金鑰在 n8n 憑證內
 配額      YouTube 昨日用掉 1,100/10,000 單位(每日重置)
 ```
+
+**容器不會自己活著**（2026-08-17 更正）：Docker Desktop 一關容器就停
+（會看到 `Exited (137)`,那是 SIGKILL,不是崩潰)。新 session 開場先跑:
+
+```powershell
+docker compose --project-directory C:\Users\admin\source\repos\InWave up -d
+```
+
+Docker Desktop 在這台機器裝在 **`%LOCALAPPDATA%\Programs\DockerDesktop\Docker Desktop.exe`**,
+不是 `C:\Program Files\Docker\`(那是舊版預設路徑,查那裡會找不到)。
+n8n 冷啟動約需 30–60 秒才會回應 `/rest/settings`,不要一停就當作壞了。
 
 ### 階段 3 的執行計畫（已與使用者討論，**尚未取得最終確認**）
 
@@ -337,12 +348,34 @@ git       main 與 origin 同步,工作區乾淨
 n8n 掛掉／逾時／格式錯 → 回落 `MoodKeywordMapper` 並寫 log。
 驗收：停掉 n8n 容器，功能仍可用；現有 18 項測試全綠。
 
-### 兩個待使用者決定
+### 規格變更（2026-08-17）：情緒改為可不選
 
-1. **`PhotoAnalysis` 存原始 JSON 還是拆成欄位？**
-   建議：存原始 JSON + 少數常用欄位（Scene / AnalyzedAt / ModelUsed）。
-   理由：AI 回傳格式之後還會改，存原文最有彈性；真要查詢再拆。
-2. **今天做到哪裡**（步驟 1–3 約為一日的量）。
+使用者發現 `Create.cshtml` 強制八選一會錨定 AI 判讀。**已定案改為可不選**，
+完整理由與實作清單見設計文件 **§3.2.1**（新增段落）。三句話版本：
+
+1. 有選 → 照 §3.2 原規格送，AI 尊重；**沒選 → 欄位整個不送**，AI 純憑照片判讀
+2. 回應新增 **`moodPick`**（封閉八選一，供回填與書背著色）；`mood[]` 維持自由發揮供顯示
+3. **零 migration**——`MoodName` 用空字串當「未指定」哨兵值即可
+
+濾鏡不受影響，它本來就可以不選（`Edit.cshtml:58-62` 的「不套用」）。
+
+### `PhotoAnalysis` 的形狀（2026-08-17 已定案：**混合**）
+
+```
+PhotoId      一對一指向 Photo
+RawJson      AI 回傳的整包原文        ← 格式還會變,存原文最有彈性
+Scene        常用,顯示「AI 怎麼理解這張照片」
+AnalyzedAt   常用,判斷要不要重跑
+ModelUsed    常用,日後比較模型版本
+```
+
+理由：AI 回傳格式還在動（`moodPick` 就是 2026-08-17 才加的），全部拆欄位等於
+每次改格式都要一次 migration；全部塞 RawJson 則連「顯示 scene」都得整包 parse。
+上面三欄是確定會常用的，其餘留在 RawJson，**真的需要查詢時再拆**。
+
+### 待使用者決定
+
+- **今天做到哪裡**（步驟 1–3 約為一日的量）。
 
 ### n8n webhook 的介面契約（暫定，實作時確認）
 
@@ -355,9 +388,14 @@ n8n 掛掉／逾時／格式錯 → 回落 `MoodKeywordMapper` 並寫 log。
 ```
 回應：
 ```json
-{ "scene": "...", "mood": ["..."], "keywords": ["..."],
+{ "ok": true, "scene": "...", "moodPick": "懷舊", "mood": ["..."], "keywords": ["..."],
   "songs": [{ "artist": "...", "title": "...", "why": "..." }] }
 ```
+
+**2026-08-17 修訂兩處**（詳見設計文件 §3.2.1 與
+`notes/2026-08-17-階段3-步驟1-n8n工作流設定.md` §3）：
+`mood` 未指定時**整個欄位不送**（不是送空字串）；回應新增 `moodPick` 與 `ok`。
+parse 失敗時回 `{ "ok": false, "error": "PARSE_FAILED", "raw": "<原始回覆>" }`。
 
 `style` 目前只有 `default`，是為「多種推薦人格」預留的接縫——
 即使只有一個值也要帶，見設計文件 §3.5.1。

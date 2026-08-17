@@ -20,12 +20,20 @@
 
         <div class="iw-mono" style="margin:34px 0 12px">二 — 這張照片的情緒是?</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
+            @* 空值 = 不指定,由 AI 判讀。預設選它:被逼著八選一時使用者只是挑個最接近的,
+               那不是意圖卻會錨定 AI(設計文件 §3.2.1) *@
+            <input type="radio" class="btn-check" name="moodName" id="mood-auto"
+                   value="" autocomplete="off" checked />
+            <label class="iw-pill is-on" for="mood-auto" style="cursor:pointer">讓 AI 判斷</label>
             @foreach (var mood in MoodKeywordMapper.AllMoods)
             {
                 <input type="radio" class="btn-check" name="moodName" id="mood-@mood"
                        value="@mood" autocomplete="off" />
                 <label class="iw-pill" for="mood-@mood" style="cursor:pointer">@mood</label>
             }
+        </div>
+        <div class="iw-mono" style="margin-top:12px;font-size:10px;color:var(--muted)">
+            自己選了就以你的選擇為準;交給 AI 則由照片內容決定
         </div>
 
         <button type="submit" class="iw-btn" style="margin-top:38px">下一步:修圖 →</button>

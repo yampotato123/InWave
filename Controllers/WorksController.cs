@@ -62,8 +62,10 @@ public class WorksController : Controller
         else if (!AllowedExtensions.Contains(Path.GetExtension(photoFile.FileName).ToLowerInvariant()))
             ModelState.AddModelError("", "只接受 jpg、png、webp 圖片。");
 
-        if (string.IsNullOrWhiteSpace(moodName) || !MoodKeywordMapper.AllMoods.Contains(moodName))
-            ModelState.AddModelError("", "請選擇一種情緒。");
+        // 情緒可以不選,交給 AI 判讀(設計文件 §3.2.1)。被逼著八選一時使用者只是挑個最接近的,
+        // 那不是意圖是雜訊,卻會錨定 AI。有選的話仍必須是 AllMoods 之一。
+        if (!string.IsNullOrWhiteSpace(moodName) && !MoodKeywordMapper.AllMoods.Contains(moodName))
+            ModelState.AddModelError("", "選到不存在的情緒,請重新選擇。");
 
         if (!ModelState.IsValid)
             return View();
@@ -82,7 +84,9 @@ public class WorksController : Controller
             OriginalPath = "/uploads/" + fileName,
             CreatedAt = DateTime.UtcNow,
             Edit = new PhotoEdit(),                         // 預設值 = 未修圖
-            Mood = new MoodProfile { MoodName = moodName! }, // 滑桿先用預設 50
+            // 空字串 = 未指定,待 AI 判讀後回填。MoodProfile 照樣建立,下游的
+            // photo.Mood 才不會變 null(Recommend:196 靠它擋 404)。滑桿先用預設 50
+            Mood = new MoodProfile { MoodName = moodName?.Trim() ?? "" },
         };
         _db.Photos.Add(photo);
         await _db.SaveChangesAsync();
@@ -205,7 +209,10 @@ public class WorksController : Controller
             PhotoPath = photo.EditedPath ?? photo.OriginalPath,
             MoodName = photo.Mood.MoodName,
             SearchKeyword = keyword,
-            PlaylistName = $"{photo.Mood.MoodName}・{DateTime.Now:MM/dd}",
+            // 情緒未指定時不要留下開頭孤伶伶的「・」
+            PlaylistName = string.IsNullOrEmpty(photo.Mood.MoodName)
+                ? $"作品・{DateTime.Now:MM/dd}"
+                : $"{photo.Mood.MoodName}・{DateTime.Now:MM/dd}",
             Songs = results.Select(r => new SongInput
             {
                 VideoId = r.VideoId,

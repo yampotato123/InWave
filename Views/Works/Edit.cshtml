@@ -33,7 +33,7 @@
 
     <aside class="iw-edit-side">
         <div>
-            <div class="iw-mono">Step 02 · 情緒 @Model.MoodName</div>
+            <div class="iw-mono">Step 02 · 情緒 @(string.IsNullOrEmpty(Model.MoodName) ? "待 AI 判讀" : Model.MoodName)</div>
             <h2 style="margin:12px 0 0;font-size:32px;font-weight:800;letter-spacing:-.03em">修圖 <span style="font-weight:400;color:var(--muted)">Adjust</span></h2>
         </div>
 
@@ -92,7 +92,11 @@
         const img = document.getElementById('source'), cv = document.getElementById('preview'), ctx = cv.getContext('2d');
         // 濾鏡與關鍵字都由伺服器端產生,與 PhotoFilters / MoodKeywordMapper 保證一致
         const CSSF = @Html.Raw(Json.Serialize(filterJs));
-        const BASE_KEYWORD = @Html.Raw(Json.Serialize(MoodKeywordMapper.GetKeyword(Model.MoodName)));
+        @* 情緒未指定時給 null:GetKeyword 此時會退回 fallback 的 chill music,
+           而那不是最終關鍵字(要等 AI 判讀),連送到前端都不該送。
+           用 Razor 註解而非 JS 註解,這段說明就不會被送到瀏覽器 *@
+        const BASE_KEYWORD = @Html.Raw(Json.Serialize(
+            string.IsNullOrEmpty(Model.MoodName) ? (string?)null : MoodKeywordMapper.GetKeyword(Model.MoodName)));
         let mod = @Html.Raw(Json.Serialize(currentModifier));
 
         function vals() {
@@ -115,7 +119,9 @@
             ctx.clearRect(0, 0, cv.width, cv.height);
             ctx.drawImage(img, 0, 0, cv.width, cv.height);
             vB.textContent = v.b; vC.textContent = v.c; vS.textContent = v.s;
-            keyword.textContent = BASE_KEYWORD + (mod !== 'none' ? ' ' + mod : '');
+            keyword.textContent = BASE_KEYWORD === null
+                ? '由 AI 判讀後決定'
+                : BASE_KEYWORD + (mod !== 'none' ? ' ' + mod : '');
         }
 
         img.onload = draw;
