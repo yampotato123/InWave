@@ -1,0 +1,218 @@
+[
+  {
+    "id": "inwaveAnalyze001",
+    "name": "inwave-analyze",
+    "active": false,
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "inwave/analyze",
+          "authentication": "headerAuth",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2.1,
+        "position": [
+          0,
+          0
+        ],
+        "id": "28ce33e2-4905-48c3-a7d4-fddf1ad010e5",
+        "name": "Webhook",
+        "webhookId": "c16aff40-098f-4ea6-936c-dabb42819bb1",
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "GJ2pb23Tkekz89xL",
+            "name": "Header Auth account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const b = $input.first().json.body ?? {};\n\nconst base = `你是音樂推薦系統。看這張照片,判斷它的氣氛,然後推薦真實存在的歌曲。\n\n只回傳 JSON,不要其他文字:\n{\n  \"scene\": \"一句話描述照片,15 字以內\",\n  \"moodPick\": \"從八個詞選一個最貼近的\",\n  \"mood\": [\"3-5 個氣氛形容詞,用中文\"],\n  \"keywords\": [\"3-5 個備用搜尋詞,用英文\"],\n  \"songs\": [\n    {\"artist\": \"歌手\", \"title\": \"歌名\", \"why\": \"為什麼配這張照片,15 字內\"}\n  ]\n}\n\n規則:\n- songs 給 5 首,必須是「真實存在且 YouTube 上找得到」的歌\n- 挑有一定知名度的,不要冷門到搜不到\n- 五首的曲風要有變化,不要全部同一種\n- 五首中至少 1 首是純音樂(演奏曲/配樂),其餘可有人聲\n- 五首中最多 1-2 首可以是動畫/遊戲/電影/影集的 OST,且作品要有知名度\n- artist / title 用該曲原本的語言寫\n- 不確定某首歌是否存在時,換一首你確定的\n- keywords 是 songs 全部找不到時的備案,避免 lofi / radio / mix / 24/7 這類詞\n- mood 用中文,keywords 用英文\n- moodPick 必須剛好是這八個詞的其中一個,不可自創、不可留空:\n  夜色 午後 溫暖 懷舊 夢幻 安靜 活力 慶祝\n  mood 陣列不受此限制,可自由發揮`;\n\nlet p = base;\n\n// 條件段 A：使用者有指定情緒才附加（沒選就整段不送，AI 無從被錨定）\nif (b.mood) {\n  p += `\n\n使用者已明確指定這張照片的情緒為「${b.mood}」。這是他的意圖,請以此為準。\n若照片內容與該情緒有落差,仍以使用者的指定優先,但在 scene 中如實描述照片。\n此時 moodPick 直接回傳「${b.mood}」。`;\n}\n\n// 條件段 B：使用者有套濾鏡才附加\nif (b.filter) {\n  p += `\n\n使用者為這張照片選擇的風格是「${b.filter}」,請讓推薦帶上這個風格的色彩。`;\n}\n\n// 條件段 C：滑桿偏離預設 100 才附加（全預設等於送雜訊）\nconst s = b.sliders ?? {};\nconst labels = { brightness: '亮度', contrast: '對比', saturation: '飽和度' };\nconst diffs = Object.keys(labels)\n  .filter(k => typeof s[k] === 'number' && s[k] !== 100)\n  .map(k => `${labels[k]}${s[k] > 100 ? '調高' : '調低'}到 ${s[k]}%`);\nif (diffs.length) {\n  p += `\n\n使用者調整了照片:${diffs.join('、')}。`;\n}\n\nreturn [{ json: { body: b, prompt: p } }];"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          220,
+          0
+        ],
+        "id": "cd89ba0e-b2d1-4568-ac61-5554ff27e3f5",
+        "name": "Build Prompt"
+      },
+      {
+        "parameters": {
+          "operation": "toBinary",
+          "sourceProperty": "body.imageBase64",
+          "options": {
+            "mimeType": "={{ $('Build Prompt').item.json.body.mimeType || 'image/jpeg' }}"
+          }
+        },
+        "type": "n8n-nodes-base.convertToFile",
+        "typeVersion": 1.1,
+        "position": [
+          440,
+          0
+        ],
+        "id": "06218434-71f8-413d-9d54-abca358f4662",
+        "name": "Convert to File"
+      },
+      {
+        "parameters": {
+          "resource": "image",
+          "operation": "analyze",
+          "modelId": {
+            "__rl": true,
+            "value": "models/gemini-3.6-flash",
+            "mode": "list",
+            "cachedResultName": "models/gemini-3.6-flash"
+          },
+          "text": "={{ $('Build Prompt').item.json.prompt }}",
+          "inputType": "binary",
+          "options": {}
+        },
+        "type": "@n8n/n8n-nodes-langchain.googleGemini",
+        "typeVersion": 1.2,
+        "position": [
+          660,
+          0
+        ],
+        "id": "8463d106-78ae-4431-b467-4ef7ca8237c2",
+        "name": "Analyze an image",
+        "credentials": {
+          "googlePalmApi": {
+            "id": "kHlYboN0UiZaTmnV",
+            "name": "Google Gemini(PaLM) Api account"
+          }
+        },
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 5000,
+        "onError": "continueErrorOutput"
+      },
+      {
+        "parameters": {
+          "jsCode": "// Gemini 重試後仍失敗才會走到這裡。回明確的錯誤碼，C# 據此走 MoodKeywordMapper fallback。\n// n8n 錯誤輸出的形狀不固定（有時 json.error 是字串，有時是物件），三種都接。\nconst item = $input.first();\nconst e = item.json ?? {};\nconst src = e.error ?? e.message ?? item.error ?? '';\nconst detail = (typeof src === 'string' ? src : (src.message ?? src.description ?? JSON.stringify(src)))\n  .toString().slice(0, 300);\nreturn [{ json: { ok: false, error: 'AI_UNAVAILABLE', detail } }];"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          880,
+          200
+        ],
+        "id": "f2c92220-4c18-48e9-8d76-174a7cf3d7bc",
+        "name": "AI Unavailable"
+      },
+      {
+        "parameters": {
+          "jsCode": "// Gemini 節點的輸出在 content.parts[0].text;不同版本欄位位置可能不同,故留兩條退路\nconst item = $input.first().json;\nconst raw = item?.content?.parts?.[0]?.text ?? item?.text ?? '';\n\n// 去掉 ```json ... ``` 圍欄\nconst cleaned = raw\n  .replace(/^\\s*```(?:json)?\\s*/i, '')\n  .replace(/```\\s*$/, '')\n  .trim();\n\ntry {\n  return [{ json: { ok: true, ...JSON.parse(cleaned) } }];\n} catch (e) {\n  // 不吞掉——把原文回傳,C# 端才知道是 AI 格式壞掉而非網路問題,並據此走 fallback\n  return [{ json: { ok: false, error: 'PARSE_FAILED', raw } }];\n}"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          880,
+          0
+        ],
+        "id": "df823ab1-3e0e-4d49-9b9c-7a5a023c6893",
+        "name": "Parse AI Response"
+      },
+      {
+        "parameters": {
+          "options": {}
+        },
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.5,
+        "position": [
+          1100,
+          0
+        ],
+        "id": "4017416b-eb3f-4b2e-abed-2ef52af5016d",
+        "name": "Respond to Webhook"
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "index": 0,
+              "node": "Build Prompt",
+              "type": "main"
+            }
+          ]
+        ]
+      },
+      "Build Prompt": {
+        "main": [
+          [
+            {
+              "index": 0,
+              "node": "Convert to File",
+              "type": "main"
+            }
+          ]
+        ]
+      },
+      "Convert to File": {
+        "main": [
+          [
+            {
+              "index": 0,
+              "node": "Analyze an image",
+              "type": "main"
+            }
+          ]
+        ]
+      },
+      "Analyze an image": {
+        "main": [
+          [
+            {
+              "index": 0,
+              "node": "Parse AI Response",
+              "type": "main"
+            }
+          ],
+          [
+            {
+              "index": 0,
+              "node": "AI Unavailable",
+              "type": "main"
+            }
+          ]
+        ]
+      },
+      "Parse AI Response": {
+        "main": [
+          [
+            {
+              "index": 0,
+              "node": "Respond to Webhook",
+              "type": "main"
+            }
+          ]
+        ]
+      },
+      "AI Unavailable": {
+        "main": [
+          [
+            {
+              "index": 0,
+              "node": "Respond to Webhook",
+              "type": "main"
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1",
+      "binaryMode": "separate"
+    },
+    "meta": {
+      "templateCredsSetupCompleted": true
+    },
+    "pinData": {}
+  }
+]

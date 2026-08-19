@@ -1,7 +1,66 @@
 # PROGRESS
 
-最後更新：2026-08-12
-遠端：https://github.com/yampotato123/InWave（**私有**）　分支 `main`　最新 commit `e761083`
+最後更新：2026-08-19
+遠端：https://github.com/yampotato123/InWave（**私有**）　分支 `main`　最新 commit `dc29527`
+
+---
+
+## 更新（2026-08-19）：階段 3 步驟 1 完成（n8n 工作流已跑通）
+
+`inwave-analyze` 工作流已建置、啟用並**實測通過**。工作流 id `inwaveAnalyze001`
+（spike 那份 `y4ngkYldXFJUm5Xb|My workflow` 原封不動留著當後路）。
+
+```
+Webhook → Build Prompt → Convert to File → Analyze an image ─┬→ Parse AI Response ─┐
+                                          (Gemini, 重試 3 次)  └→ AI Unavailable ────┴→ Respond
+```
+
+**工作流的原始碼在 `scripts/build-n8n-workflow.ps1`**，JSON 是它的產物
+（`n8n-workflows/inwave-analyze.json`）。改流程改腳本再重跑，不要只在 UI 點——
+2026-08-17 在 UI 點出來的半成品漏了 `httpMethod`，因為 UI 改動 git 看不到。
+
+### 實測證據（2026-08-19）
+
+| 案例 | 結果 |
+|---|---|
+| 真照片、不送 `mood` | `ok:true`，AI 自行判 `moodPick:"懷舊"`（落在八種內） |
+| 真照片、`mood=夜色 filter=冷夜 brightness=130` | `ok:true`，`moodPick:"夜色"` 照回填，推薦轉為 dark jazz / noir |
+| 條件段是否真的組進 prompt | 讀執行紀錄的 `Build Prompt` 輸出原文確認三段都在（含「亮度調高到 130%」） |
+| 壞掉的圖（隨機位元組） | `{"ok":false,"error":"AI_UNAVAILABLE","detail":"Bad request - please check your parameters"}` |
+
+驗證腳本：`scripts/test-n8n-webhook.ps1`（不經過 C#，C# 出問題時可用它分辨哪端壞掉）。
+
+### 這一輪修掉的三個問題
+
+1. **Webhook 是 GET 不是 POST**：n8n 的 `httpMethod` 預設 GET，UI 半成品與 spike 都沒設。
+   症狀是 POST 回 `404 This webhook is not registered for POST requests`。
+2. **失敗時 webhook 回 200 空 body**：Gemini 一失敗，工作流中斷，n8n 回 200 + 零長度 body。
+   C# 那端會看到 200 然後 parse 空字串——正是契約要避免的無聲失敗。
+   已改為 Gemini 節點 `retryOnFail`（3 次、間隔 5 秒）＋錯誤輸出接 `AI Unavailable` 節點，
+   **任何失敗都回 `{"ok":false,"error":"AI_UNAVAILABLE","detail":"…"}`**。
+3. **Gemini prompt 是壞的 v3**：UI 那份的規則被截斷（`- 五首的曲風要有` 斷句、
+   `- mood 用中文,ke` 斷句、尾巴多一句 `（mood 用中文那  的問題。）`），且沒有 `moodPick`。
+   已換成筆記 §2 的 v4 全文。
+
+### 步驟 2 要知道的三個數字與事實
+
+- **延遲落差很大**：實測成功案例 16s / 20s / 31s / 85s / 105s。
+  C# 的 `HttpClient.Timeout` 不能設 30 秒了事，也不該無上限——
+  建議 120 秒上限，逾時走 `MoodKeywordMapper` fallback（步驟 5）。
+- **Gemini 會回 503**：`This model is currently experiencing high demand`，
+  2026-08-19 連續三次都是。這是上游狀況不是 bug，重試已在工作流內處理。
+- **認證**：header `X-InWave-Token`，值在 `.env` 的 `N8N_WEBHOOK_TOKEN`。
+  C# 從設定讀取後放進 request header（容器內位址 `http://n8n:5678/webhook/inwave/analyze`）。
+
+### 兩個操作上的坑
+
+- **改完工作流一定要 `docker restart n8n`**：webhook 註冊表在記憶體，
+  `n8n update:workflow` 自己也會印警告說改動不會生效。
+- **重啟後別急著打**：n8n 起來到 webhook 註冊完之間有空窗，這段期間 POST 會拿到
+  express 的 **HTML** 404（`Cannot POST /webhook/...`），而不是 n8n 的 JSON 404。
+  就緒判準：不帶 token POST 應得 **403**。
+- **`scripts/fixtures/test.jpg` 不能拿來測 AI**：那是 562 bytes 的殘缺 JPEG
+  （GDI+ 也開不起來），Gemini 直接回 Bad request。上傳驗證夠用，AI 測試要用真照片。
 
 ---
 
@@ -279,7 +338,9 @@ Phase 1 已驗證完成，所以視覺這輪可以放手做。
 | 1　容器化 InWave | ✅ 完成 |
 | 2　n8n 納入同一個 compose | ✅ 完成 |
 | **Spike　驗證 AI 路徑** | ✅ **完成，且推翻了原始設計** |
-| **3　AI 判讀接進 InWave** | ⬜ **未開始 ← 下一步** |
+| **3-1　n8n 工作流** | ✅ **完成並實測**（2026-08-19，見本檔最上方） |
+| **3-2　C# 打得到 n8n** | ⬜ **未開始 ← 下一步** |
+| 3-3 持久化 / 3-4 YouTube 改歌名搜 / 3-5 fallback | ⬜ 未開始 |
 | 4　AI 風格濾鏡（選配） | ⬜ 未開始 |
 
 ### 開場先讀這三份（依序）
@@ -526,16 +587,19 @@ git filter-repo --email-callback '
    與 `InWave.Tests` 相同的 `Compile/Content/None Remove`。
    **通則：放在專案資料夾內的備份，Web SDK 都會當成原始碼。**
 
-## 驗證腳本（目前在暫存區，未進版控）
+## 驗證腳本（`scripts/`，已進版控）
 
-端對端驗證腳本寫在這次 session 的 scratchpad，**session 結束後會消失**：
+| 腳本 | 做什麼 |
+|---|---|
+| `e2e-mood.ps1` | 情緒可不選的端對端驗證（2026-08-17 進版控） |
+| `test-n8n-webhook.ps1` | 直接打 n8n webhook，不經過 C#（2026-08-19） |
+| `build-n8n-workflow.ps1` | 產生 `n8n-workflows/inwave-analyze.json`（2026-08-19） |
 
-- `e2e.ps1` — 走完上傳 → 情緒 → 推薦 → 存歌單 → 作品頁
-- `e2e-edit.ps1` — 修圖頁 17 項，含錯誤路徑（無預覽圖、偽造濾鏡名）、滑桿夾值、狀態還原
-- `dbq/` — 小工具，直接查 SQLite 內容（`dotnet run --project dbq -- <db> "<sql>"`）
+早期的 `e2e.ps1`、`e2e-edit.ps1`、`dbq/` 寫在當時 session 的 scratchpad，**已隨 session 消失**，
+要回歸測試修圖頁得重寫。比對 HTML 前記得先 `HtmlDecode`，並把空白壓成單一空格（見下方第 2 條）。
 
-要保留的話得搬進 repo（例如 `scripts/`）。目前**沒有搬**，所以下次要回歸測試得重寫。
-比對 HTML 前記得先 `HtmlDecode`，並把空白壓成單一空格（見上面第 2 條）。
+`.ps1` 一律存 UTF-8 **with BOM**：無 BOM 的中文 `.ps1` 在 Windows PowerShell 5.1 會被當
+Big5 解碼而 ParserError。現有三支都已驗過 5.1 解析為 0 errors。
 
 ---
 
