@@ -1,75 +1,112 @@
 @model List<InWave.Models.Playlist>
 @{
-    ViewData["Title"] = "我的歌單";
-    var sel = Model.FirstOrDefault();
+    ViewData["Title"] = "收藏庫";
+
+    // 篩選用的情緒只列出「真的有作品」的那幾種。
+    // 舊版寫死五顆而且完全沒接功能,那是假的按鈕。
+    var moods = Model
+        .Select(p => p.Photo?.Mood?.MoodName)
+        .Where(m => !string.IsNullOrEmpty(m))
+        .Distinct()
+        .OrderBy(m => Array.IndexOf(InWave.Services.MoodKeywordMapper.AllMoods, m))
+        .ToList();
 }
 
-@* 收藏櫃:每份歌單一支 VHS 書背,款式依 Id 輪替 s1~s28 *@
-<main style="position:relative;z-index:10;min-height:calc(100vh - 61px);display:flex;flex-direction:column;justify-content:center;padding:32px 0 116px">
+@* 不設 min-height:內容自然堆疊即可。撐滿整個視窗只會在標題與書架之間留一大片空白。 *@
+<main style="position:relative;z-index:10;padding:36px 0 110px">
 
-    <div style="display:flex;justify-content:center;gap:6px;padding-bottom:40px;flex-wrap:wrap">
-        @foreach (var mood in new[] { "全部 All", "夜色 Night", "午後 Afternoon", "夢幻 Dreamy", "安靜 Calm" })
+    <header style="max-width:min(1100px,calc(100% - 80px));margin:0 auto 8px;
+                   display:flex;align-items:baseline;gap:18px;flex-wrap:wrap">
+        <h1 class="iw-serif" style="margin:0;font-size:clamp(30px,4vw,46px);line-height:1">收藏庫</h1>
+        <span class="iw-mono">@Model.Count 份歌單</span>
+
+        @if (moods.Count > 1)
         {
-            @* 篩選尚未接上 WorksController.Index 的 query 參數,先維持靜態 *@
-            <button class="iw-pill @(mood == "全部 All" ? "is-on" : "")" type="button">@mood</button>
+            <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">
+                <button class="iw-pill is-on" type="button" data-mood="">全部</button>
+                @foreach (var mood in moods)
+                {
+                    <button class="iw-pill" type="button" data-mood="@mood">@mood</button>
+                }
+            </div>
         }
-    </div>
+    </header>
 
     @if (Model.Count == 0)
     {
-        <div style="text-align:center">
-            <div class="iw-mono" style="margin-bottom:18px">收藏櫃是空的 Empty shelf</div>
-            <a class="iw-btn" asp-action="Create">建立第一份歌單</a>
+        <div class="iw-shelf">
+            <div class="iw-slot"></div>
+            <div class="iw-slot" style="height:262px"></div>
+            <div class="iw-slot" style="height:318px"></div>
+        </div>
+        <div class="iw-rail"></div>
+
+        <div style="text-align:center;margin-top:52px">
+            <p style="margin:0 auto;max-width:34ch;color:var(--muted);line-height:1.9">
+                架上還沒有東西。挑一張照片,InWave 會看著它選出五首歌。
+            </p>
+            <a class="iw-btn" asp-action="Create" style="margin-top:24px">建立第一份歌單</a>
         </div>
     }
     else
     {
-        <div class="iw-shelf">
+        @* 每份歌單一支 VHS 書背,款式依 Id 輪替 s1~s28,印刷色由情緒決定 *@
+        <div class="iw-shelf" role="tablist" aria-label="歌單">
             @foreach (var p in Model)
             {
                 var skin = "s" + ((p.Id % 28) + 1);
-                var on = sel != null && p.Id == sel.Id;
-                var h = 292 + (p.Id * 37) % 88;
-                <a class="iw-spine @skin @(on ? "is-on" : "")"
-                   style="--c:@Html.Raw(MoodColor(p.Photo?.Mood?.MoodName)); --h:@(on ? 396 : h)px"
-                   asp-controller="Works" asp-action="Details" asp-route-id="@p.Id" title="@p.Name">
+                var h = 268 + (p.Id * 37) % 92;
+                var cover = p.Photo?.EditedPath ?? p.Photo?.OriginalPath ?? "";
+                <button type="button" class="iw-spine @skin" role="tab"
+                        style="--c:@Html.Raw(MoodColor(p.Photo?.Mood?.MoodName)); --h:@(h)px"
+                        data-id="@p.Id"
+                        data-mood="@(p.Photo?.Mood?.MoodName ?? "")"
+                        data-name="@p.Name"
+                        data-cover="@cover"
+                        data-tracks="@p.PlaylistSongs.Count"
+                        data-date="@p.CreatedAt.ToLocalTime().ToString("yyyy.MM.dd")"
+                        data-play="@Url.Action("Details", new { id = p.Id })"
+                        data-edit="@Url.Action("Edit", new { id = p.PhotoId })"
+                        title="@p.Name">
                     <span class="wear"></span>
                     <span class="band"></span>
                     <span class="cap"></span>
                     <span class="label"><span class="title">@p.Name</span></span>
                     <span class="art"></span>
                     <span class="badge">@p.CreatedAt.ToLocalTime().ToString("MM/dd")</span>
-                </a>
+                </button>
             }
 
-            @if (sel != null)
+            @*
+                架上留幾個空位。歌單很少的時候,一支孤零零的帶子看起來像頁面壞了;
+                留白的插槽讓它讀成「這個架子還有位置」,而點下去就是去放一卷新的。
+            *@
+            @for (var i = Model.Count; i < 5; i++)
             {
-                <div class="iw-cover">
-                    <img src="@(sel.Photo?.EditedPath ?? sel.Photo?.OriginalPath)" alt="@sel.Name">
-                </div>
+                <a class="iw-slot" asp-action="Create" title="建立新歌單"
+                   style="height:@(246 + (i * 29) % 74)px"><span>+</span></a>
             }
         </div>
+        <div class="iw-rail"></div>
 
-        @if (sel != null)
-        {
-            <div style="text-align:center;padding-top:52px">
-                <h1 class="iw-serif" style="margin:0;font-size:56px;line-height:1.05">@sel.Name</h1>
-                <div class="iw-mono" style="margin-top:13px;color:var(--accent);letter-spacing:.26em">
-                    @sel.Photo?.Mood?.MoodName · @sel.PlaylistSongs.Count TRACKS · @sel.CreatedAt.ToLocalTime().ToString("yyyy.MM.dd")
-                </div>
+        @* 抽出來的那一卷。內容由 JS 依選取的書背填入,不必重新整理頁面。 *@
+        <section class="iw-sleeve" id="sleeve">
+            <div class="art"><img id="sleeveCover" src="" alt="" /></div>
+            <div>
+                <h1 id="sleeveName"></h1>
+                <div class="iw-mono meta" id="sleeveMeta"></div>
                 <div class="iw-wave">
                     @for (var i = 0; i < 44; i++)
                     {
                         <i style="height:@(26 + (int)(Math.Sin(i * 0.8) * 10) + (i * 13) % 9)px;animation-duration:@((1.1 + (i % 5) * 0.14).ToString("0.00"))s;animation-delay:@(((i % 7) * 0.09).ToString("0.00"))s"></i>
                     }
                 </div>
-                <div style="display:flex;gap:10px;justify-content:center;margin-top:26px;flex-wrap:wrap">
-                    <a class="iw-btn" asp-controller="Works" asp-action="Details" asp-route-id="@sel.Id">▶ 播放 Play</a>
-                    <a class="iw-btn iw-btn-ghost" asp-controller="Works" asp-action="Edit" asp-route-id="@sel.PhotoId">重新修圖 Edit</a>
-                    <a class="iw-btn iw-btn-ghost" asp-controller="Works" asp-action="Create">建立新作品</a>
+                <div class="acts">
+                    <a class="iw-btn" id="sleevePlay" href="#">▶ 播放</a>
+                    <a class="iw-btn iw-btn-ghost" id="sleeveEdit" href="#">重新修圖</a>
                 </div>
             </div>
-        }
+        </section>
     }
 </main>
 
@@ -81,4 +118,54 @@
         "夢幻" => "#9B4BD1", "安靜" => "#3F6B6B", "活力" => "#D1B32B", "慶祝" => "#D12B6B",
         _ => "#3A3A44"
     };
+}
+
+@section Scripts {
+    <script>
+        // 選書背 → 換下方那一卷。純前端切換,不重新整理。
+        // (舊版把選取寫死成第一筆,而且封面是絕對定位疊在書背上。)
+        const spines = [...document.querySelectorAll('.iw-spine')];
+        const sleeve = document.getElementById('sleeve');
+
+        function select(el) {
+            if (!el) return;
+            spines.forEach(s => {
+                s.classList.toggle('is-on', s === el);
+                s.setAttribute('aria-selected', s === el ? 'true' : 'false');
+            });
+
+            const d = el.dataset;
+            sleeveCover.src = d.cover;
+            sleeveCover.alt = d.name;
+            sleeveName.textContent = d.name;
+            sleeveMeta.textContent = [d.mood || '未指定情緒', d.tracks + ' TRACKS', d.date]
+                .join(' · ');
+            sleevePlay.href = d.play;
+            sleeveEdit.href = d.edit;
+
+            // 重播抽出的動畫
+            sleeve.style.animation = 'none';
+            void sleeve.offsetWidth;
+            sleeve.style.animation = '';
+        }
+
+        spines.forEach(s => s.addEventListener('click', () => select(s)));
+        select(spines[0]);
+
+        // 情緒篩選。舊版那幾顆按鈕是靜態的,按了不會有事。
+        document.querySelectorAll('[data-mood]').forEach(chip => {
+            if (!chip.classList.contains('iw-pill')) return;
+            chip.addEventListener('click', () => {
+                const want = chip.dataset.mood;
+                document.querySelectorAll('.iw-pill[data-mood]')
+                    .forEach(c => c.classList.toggle('is-on', c === chip));
+
+                spines.forEach(s => { s.hidden = want !== '' && s.dataset.mood !== want; });
+
+                // 篩掉的若正好是選中那支,就改選第一支還看得到的
+                const visible = spines.filter(s => !s.hidden);
+                if (!visible.some(s => s.classList.contains('is-on'))) select(visible[0]);
+            });
+        });
+    </script>
 }

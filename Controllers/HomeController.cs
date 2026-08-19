@@ -11,11 +11,8 @@ public class HomeController : Controller
         return View();
     }
 
-    public IActionResult Privacy()
-    {
-        return View();
-    }
-
+    // Error 由 Program.cs 的 UseExceptionHandler("/Home/Error") 使用。
+    // (樣板附的 Privacy 頁沒有任何連結指向它,已於 2026-08-20 連同 view 一起刪除。)
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
     public IActionResult Error()
     {

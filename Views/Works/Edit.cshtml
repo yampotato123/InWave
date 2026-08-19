@@ -13,7 +13,7 @@
     var currentModifier = PhotoFilters.Find(Model.FilterName)?.KeywordModifier ?? "none";
 }
 
-<div asp-validation-summary="All" class="mb-errors" style="margin:20px 40px 0"></div>
+<div asp-validation-summary="All" class="iw-errors" style="margin:20px 40px 0"></div>
 
 <form asp-action="Edit" method="post" class="iw-edit" id="editForm">
     <input type="hidden" asp-for="PhotoId" />

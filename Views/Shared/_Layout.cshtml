@@ -13,10 +13,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;800&family=Oswald:wght@300;400;500;600;700&family=Instrument+Serif&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+TC:wght@300;400;500;700&family=Noto+Serif+TC:wght@400;600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
-    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
-    @* inwave.css 要在 site.css 之後,才能蓋過舊樣式 *@
+    @* site.css 已刪除(49 個 class 只剩 3 個在用,其餘是改版前的 mb-* 遺留),
+       還需要的三條規則已併入 inwave.css。scoped CSS 也一併移除,沒有 .cshtml.css 了。 *@
     <link rel="stylesheet" href="~/css/inwave.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/InWave.styles.css" asp-append-version="true" />
 </head>
 <body class="iw">
     @* 背景:CD 眩光 + 音波環 + 掃描線 *@
@@ -28,17 +27,19 @@
 
     <header class="iw-header">
         <a class="iw-brand" asp-controller="Home" asp-action="Index"><i></i> InWave</a>
+        @*
+            兩個入口就夠了。先前的「我的歌單」「播放」和右上的「收藏庫」
+            三個都指向 Works/Index,同一個地方給三個名字只會讓人猶豫該點哪個。
+        *@
         <nav class="iw-nav">
-            <a class="@PillClass(controller == "Works" && action == "Index")"
-               asp-controller="Works" asp-action="Index">一 我的歌單</a>
-            <a class="@PillClass(controller == "Works" && (action == "Create" || action == "Edit"))"
-               asp-controller="Works" asp-action="Create">二 建立新歌單</a>
-            <a class="@PillClass(controller == "Works" && (action == "Details" || action == "Recommend"))"
-               asp-controller="Works" asp-action="Index">三 播放</a>
+            <a class="@PillClass(controller == "Works" && (action == "Create" || action == "Edit" || action == "Recommend"))"
+               asp-controller="Works" asp-action="Create" title="建立歌單">
+                <span class="iw-plus" aria-hidden="true">+</span> 建立歌單
+            </a>
+            <a class="@PillClass(controller == "Works" && (action == "Index" || action == "Details"))"
+               asp-controller="Works" asp-action="Index">收藏庫</a>
         </nav>
-        @* 先前這裡是純文字 div,看起來像按鈕卻點不動 *@
-        <a class="iw-mono" style="text-align:right;text-decoration:none"
-           asp-controller="Works" asp-action="Index">收藏庫 Library</a>
+        <span></span>
     </header>
 
     @RenderBody()
