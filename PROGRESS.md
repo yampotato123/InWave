@@ -50,9 +50,24 @@ AI 掛掉時功能不會消失。回落有兩層，都經過實測（不是只�
     → 存成歌單
 ```
 
+### 收尾：`moodPick` 回填（2026-08-19，階段 3 之後補的）
+
+使用者沒選情緒時，把 AI 判的 `moodPick` 寫回 `MoodProfile.MoodName`
+（`WorksController.BackfillMoodPickAsync`）。**不覆蓋使用者自己選的**——那是他的意圖。
+
+實測（容器，不選情緒建立作品）：
+
+```
+log            情緒未指定,以 AI 判讀的「懷舊」回填(photoId=5)
+歌單預設名稱   懷舊・08/19        ← 回填前是「作品・08/19」
+收藏櫃書背色   #8A7A4F(懷舊) x1  ← 回填前是 #3A3A44 預設灰
+```
+
+安全性來自上游：`moodPick` 一定落在八種內，範圍外的值在
+`PhotoAnalysisService.Parse` 就被換成 null 了，不會流到這裡。
+
 剩下的接縫（都在上面各節有記）：
 
-- `moodPick` 尚未回填 `MoodProfile.MoodName` → 沒選情緒時書背仍是預設灰
 - 沒有「重新判讀」的入口 → 改了 prompt 之後舊判讀會一直沿用
 - 容器的 `.env` 沒有 `YOUTUBE_API_KEY` → 容器內只會回示範資料
 - 階段 4（AI 風格濾鏡）未開始，本來就是選配
@@ -108,9 +123,8 @@ RADWIMPS - スパークル                 → Radwimps - Topic   ← Topic 規�
 
 - **容器測不到這段**：`.env` 的 `YOUTUBE_API_KEY` 是空的，容器內會回落示範資料。
   要在容器驗證得把金鑰填進 `.env` 再 `docker compose up -d`。
-- **`moodPick` 沒有回填** `MoodProfile.MoodName`。所以使用者沒選情緒時，
-  收藏櫃的書背仍是預設灰（`Index.cshtml:78-83` 的 switch 認不得空字串）。
-  這是刻意留的：回填會改動既有資料，值得單獨一步。
+- ~~**`moodPick` 沒有回填** `MoodProfile.MoodName`~~ → 2026-08-19 已補，
+  見本檔最上方「收尾：`moodPick` 回填」。
 
 ---
 

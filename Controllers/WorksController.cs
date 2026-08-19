@@ -213,6 +213,9 @@ public class WorksController : Controller
         // 判讀結果已持久化,同一張照片只打一次 AI(階段 3 步驟 3)
         var analysis = await EnsureAnalysisAsync(photo);
 
+        // 使用者沒選情緒時,用 AI 判的補上——書背才會有顏色,歌單才有名字
+        await BackfillMoodPickAsync(photo, analysis);
+
         // 主線:AI 看照片推的歌。AI 沒判成、或推的歌一首都在 YouTube 上找不到時,
         // 回落到規則關鍵字搜尋——功能不會因為 AI 掛掉而消失。
         var results = new List<SongResult>();
@@ -326,6 +329,30 @@ public class WorksController : Controller
             string.Join(" / ", result.Songs.Select(s => $"{s.Artist} - {s.Title}")));
 
         return result;
+    }
+
+    /// <summary>
+    /// 使用者沒選情緒時(MoodName 是空字串哨兵值),把 AI 判的 moodPick 寫回去。
+    ///
+    /// **不覆蓋使用者自己選的**——那是他明確的意圖(設計文件 §3.2)。
+    /// moodPick 一定落在 MoodKeywordMapper.AllMoods 的八種內:範圍外的值在
+    /// PhotoAnalysisService.Parse 就被換成 null 了,不會流到這裡。
+    ///
+    /// 補上之後影響三處:收藏櫃的書背印刷色(Index.cshtml:78-83)、
+    /// 歌單的預設名稱、以及 AI 不可用時回落的關鍵字。
+    /// </summary>
+    private async Task BackfillMoodPickAsync(Photo photo, PhotoAnalysisResult? analysis)
+    {
+        if (analysis is not { Ok: true, MoodPick: { Length: > 0 } moodPick })
+            return;
+        if (photo.Mood == null || !string.IsNullOrEmpty(photo.Mood.MoodName))
+            return;
+
+        photo.Mood.MoodName = moodPick;
+        await _db.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "情緒未指定,以 AI 判讀的「{MoodPick}」回填(photoId={PhotoId})", moodPick, photo.Id);
     }
 
     /// <summary>
