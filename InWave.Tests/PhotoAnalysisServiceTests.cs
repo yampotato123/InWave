@@ -163,6 +163,94 @@ public class PhotoAnalysisServiceTests
         Assert.Equal("NETWORK", result.Error);
     }
 
+    // ── 型別不符:AI 可以回任何形狀,而本服務對外宣告「不丟例外」。
+    //    這些案例先前會丟 InvalidOperationException,結果是整頁 500 而不是回落。
+    [Theory]
+    [InlineData("""[{"ok":true}]""")]          // 最外層是陣列
+    [InlineData("""[]""")]
+    [InlineData(""""just a string"""")]
+    [InlineData("""42""")]
+    public async Task 回應最外層不是物件_回BAD_JSON而不是丟例外(string body)
+    {
+        var result = await AnalyzeAsync(HttpStatusCode.OK, body);
+
+        Assert.False(result.Ok);
+        Assert.Equal("BAD_JSON", result.Error);
+    }
+
+    [Theory]
+    [InlineData("""{"ok":"true","scene":"x"}""")]   // 字串而非布林
+    [InlineData("""{"ok":1,"scene":"x"}""")]        // 數字
+    [InlineData("""{"ok":null,"scene":"x"}""")]
+    [InlineData("""{"scene":"x"}""")]               // 根本沒有 ok
+    public async Task ok不是布林true_一律視為失敗(string body)
+    {
+        var result = await AnalyzeAsync(HttpStatusCode.OK, body);
+
+        Assert.False(result.Ok);
+    }
+
+    [Fact]
+    public async Task error欄位不是字串_不丟例外()
+    {
+        var result = await AnalyzeAsync(HttpStatusCode.OK, """{"ok":false,"error":500}""");
+
+        Assert.False(result.Ok);
+        Assert.Equal("UNKNOWN", result.Error);   // 取不到就用預設值,不是炸掉
+    }
+
+    [Fact]
+    public async Task 陣列裡混雜非字串_過濾掉而不是丟例外()
+    {
+        var result = await AnalyzeAsync(HttpStatusCode.OK,
+            """{"ok":true,"mood":["夢幻",42,null,"懷舊"],"keywords":"不是陣列","songs":[]}""");
+
+        Assert.True(result.Ok);
+        Assert.Equal(new[] { "夢幻", "懷舊" }, result.Mood);
+        Assert.Empty(result.Keywords);
+    }
+
+    [Fact]
+    public async Task 歌曲缺歌手或歌名_跳過那筆()
+    {
+        var result = await AnalyzeAsync(HttpStatusCode.OK, """
+            {"ok":true,"songs":[{"artist":"","title":"沒有歌手"},
+                                {"artist":"有歌手","title":""},
+                                {"artist":"完整","title":"這首"},
+                                "這根本不是物件"]}
+            """);
+
+        Assert.Single(result.Songs);
+        Assert.Equal("完整", result.Songs[0].Artist);
+    }
+
+    [Fact]
+    public async Task 歌曲數量超過五首_只取前五首()
+    {
+        // prompt 要 5 首,但模型漂移時可能回更多。一首 = 一次 YouTube 搜尋 = 100 單位,
+        // 不設上限的話 40 首就是 4,000 單位(一天只有 10,000)。
+        var many = string.Join(",", Enumerable.Range(1, 40)
+            .Select(i => $$"""{"artist":"歌手{{i}}","title":"歌{{i}}"}"""));
+        var result = await AnalyzeAsync(HttpStatusCode.OK, $$"""{"ok":true,"songs":[{{many}}]}""");
+
+        Assert.Equal(5, result.Songs.Count);
+        Assert.Equal("歌手1", result.Songs[0].Artist);
+    }
+
+    [Fact]
+    public void ParseRaw_與首次判讀走同一段解析()
+    {
+        // 每次快取命中都走這條路。若與 AnalyzeAsync 的解析不一致,
+        // 「第一次看到的推薦」與「重新整理後看到的」會不一樣。
+        var service = MakeService(HttpStatusCode.OK, "");
+
+        var result = service.ParseRaw("""{"ok":true,"scene":"海邊","moodPick":"寂寥","mood":["寂寥"]}""");
+
+        Assert.True(result.Ok);
+        Assert.Equal("海邊", result.Scene);
+        Assert.Null(result.MoodPick);   // 八種以外,這裡也要擋掉
+    }
+
     [Fact]
     public async Task HTTP錯誤_錯誤碼帶上狀態碼()
     {

@@ -91,20 +91,26 @@ public class PhotoAnalysisService : IPhotoAnalysisService
     private PhotoAnalysisResult Parse(string body)
     {
         // 工作流失敗時 n8n 也是回 200 + {"ok":false,...},所以狀態碼不能當成功判準
-        JsonElement root;
-        try
+        using JsonDocument? doc = TryParseJson(body);
+        if (doc == null)
+            return PhotoAnalysisResult.Failure("BAD_JSON", body);
+
+        var root = doc.RootElement;
+
+        // 這是最不可信的輸入:AI 可以回任何形狀。型別一律先驗再取,
+        // 否則 TryGetProperty / GetBoolean / GetString 會丟例外,
+        // 而本服務對外宣告「不丟例外」——丟了就是整頁 500 而不是回落。
+        if (root.ValueKind != JsonValueKind.Object)
         {
-            root = JsonDocument.Parse(body).RootElement;
-        }
-        catch (JsonException ex)
-        {
-            _logger.LogError(ex, "n8n 回應不是合法 JSON:{Body}", Truncate(body, 500));
+            _logger.LogError("n8n 回應的最外層不是物件({Kind}):{Body}",
+                root.ValueKind, Truncate(body, 500));
             return PhotoAnalysisResult.Failure("BAD_JSON", body);
         }
 
-        if (!root.TryGetProperty("ok", out var ok) || !ok.GetBoolean())
+        var isOk = root.TryGetProperty("ok", out var ok) && ok.ValueKind == JsonValueKind.True;
+        if (!isOk)
         {
-            var error = root.TryGetProperty("error", out var e) ? e.GetString() : null;
+            var error = GetString(root, "error");
             _logger.LogWarning("n8n 判讀失敗:{Error}", error ?? "(未提供 error 欄位)");
             return PhotoAnalysisResult.Failure(error ?? "UNKNOWN", body);
         }
@@ -130,6 +136,19 @@ public class PhotoAnalysisService : IPhotoAnalysisService
             RawJson: body);
     }
 
+    private JsonDocument? TryParseJson(string body)
+    {
+        try
+        {
+            return JsonDocument.Parse(body);
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "n8n 回應不是合法 JSON:{Body}", Truncate(body, 500));
+            return null;
+        }
+    }
+
     private static string? GetString(JsonElement root, string name) =>
         root.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String
             ? v.GetString()
@@ -146,6 +165,12 @@ public class PhotoAnalysisService : IPhotoAnalysisService
             .ToList();
     }
 
+    /// <summary>
+    /// prompt 要 5 首,但這裡不能假設 AI 一定守約。沒有上限的話,模型漂移回 40 首
+    /// 就是一次 4,000 單位的 YouTube 配額(一天只有 10,000),頁面也會卡住。
+    /// </summary>
+    private const int MaxSongs = 5;
+
     private static IReadOnlyList<AnalyzedSong> GetSongs(JsonElement root)
     {
         if (!root.TryGetProperty("songs", out var songs) || songs.ValueKind != JsonValueKind.Array)
@@ -158,6 +183,7 @@ public class PhotoAnalysisService : IPhotoAnalysisService
                 Title: GetString(s, "title") ?? "",
                 Why: GetString(s, "why") ?? ""))
             .Where(s => s.Artist != "" && s.Title != "")
+            .Take(MaxSongs)
             .ToList();
     }
 

@@ -18,6 +18,13 @@ builder.Services.AddHttpClient<IPhotoAnalysisService, PhotoAnalysisService>(clie
 {
     client.Timeout = TimeSpan.FromSeconds(
         builder.Configuration.GetValue<int?>("N8n:TimeoutSeconds") ?? 120);
+})
+// n8n 容器停著時,連線被拒之前預設會等約 11 秒(實測),而那是每一張新照片都要付的等待。
+// 連得上的話握手是毫秒等級,所以 5 秒足夠區分「慢」與「不在」。
+// 這個上限只管建立連線,不影響上面那個等回應的 120 秒。
+.ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+{
+    ConnectTimeout = TimeSpan.FromSeconds(5),
 });
 
 var app = builder.Build();

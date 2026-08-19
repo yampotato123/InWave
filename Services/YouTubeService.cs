@@ -100,8 +100,10 @@ public class YouTubeService : IYouTubeService
         if (artist.Length == 0 || title.Length == 0)
             return null;
 
-        // 快取鍵加前綴,與 SearchAsync 的關鍵字搜尋分開,避免兩種語意共用同一筆
-        var cacheKey = $"song:{artist} - {title}";
+        // 快取鍵加前綴,與 SearchAsync 的關鍵字搜尋分開,避免兩種語意共用同一筆。
+        // 一律轉小寫:AI 有時回「Beach House」有時回「beach house」,大小寫敏感的話
+        // 同一首歌會各燒一次 100 單位的配額。
+        var cacheKey = $"song:{artist} - {title}".ToLowerInvariant();
         var cacheCutoff = DateTime.UtcNow - CacheDuration;
         var cached = await _db.SearchCaches
             .Where(c => c.Query == cacheKey && c.FetchedAt > cacheCutoff)
@@ -177,17 +179,27 @@ public class YouTubeService : IYouTubeService
     }
 
     /// <summary>
-    /// 從候選中挑最可能是「原曲本身」的那支。
-    /// 「- Topic」是 YouTube 自動為唱片公司音源建立的頻道,幾乎一定是原曲;
-    /// 其次是頻道名帶歌手名的(官方頻道);再其次才是第一筆(通常是翻唱或二創)。
+    /// 從候選中挑最可能是「這位歌手的原曲」的那支。
+    ///
+    /// 「- Topic」是 YouTube 為發行到串流的音源自動建立的頻道,**翻唱歌手也會有**,
+    /// 所以單看 Topic 不夠:搜「RADWIMPS スパークル」時,某翻唱者的
+    /// 「〇〇 - Topic」可能排在官方上傳之前。歌手名必須一起看。
+    ///
+    /// 順序:Topic 且頻道含歌手名 → 頻道含歌手名 → 任何 Topic → 第一筆。
+    /// 注意頻道比對是子字串,仍可能誤命中(歌手 IU 命中頻道 MIUMIU),
+    /// 但排在前兩順位的條件同時要求兩個特徵,誤判機率低很多。
     /// </summary>
     private static SongResult? Pick(List<SongResult> candidates, string artist)
     {
         if (candidates.Count == 0)
             return null;
 
-        return candidates.FirstOrDefault(c => c.Artist.EndsWith("- Topic", StringComparison.OrdinalIgnoreCase))
-            ?? candidates.FirstOrDefault(c => c.Artist.Contains(artist, StringComparison.OrdinalIgnoreCase))
+        bool IsTopic(SongResult c) => c.Artist.EndsWith("- Topic", StringComparison.OrdinalIgnoreCase);
+        bool HasArtist(SongResult c) => c.Artist.Contains(artist, StringComparison.OrdinalIgnoreCase);
+
+        return candidates.FirstOrDefault(c => IsTopic(c) && HasArtist(c))
+            ?? candidates.FirstOrDefault(HasArtist)
+            ?? candidates.FirstOrDefault(IsTopic)
             ?? candidates[0];
     }
 

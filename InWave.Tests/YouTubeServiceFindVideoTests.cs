@@ -82,6 +82,20 @@ public class YouTubeServiceFindVideoTests : IDisposable
     }
 
     [Fact]
+    public async Task 別的歌手的Topic頻道_不能贏過本人的頻道()
+    {
+        // 「- Topic」是任何發行到串流的作品都會有的,翻唱歌手也有自己的 Topic 頻道。
+        // 只看 Topic 前綴的話,會把翻唱當成原曲。
+        var handler = new StubHandler(HttpStatusCode.OK, Items(
+            ("cover-topic", "スパークル (Cover)", "某翻唱歌手 - Topic", "none"),
+            ("official", "Sparkle - movie ver.", "RADWIMPS - Topic", "none")));
+
+        var result = await MakeService(handler).FindVideoAsync("RADWIMPS", "スパークル");
+
+        Assert.Equal("official", result!.VideoId);
+    }
+
+    [Fact]
     public async Task 沒有Topic頻道時_選頻道名含歌手名的()
     {
         var handler = new StubHandler(HttpStatusCode.OK, Items(

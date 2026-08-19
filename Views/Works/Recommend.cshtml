@@ -6,7 +6,27 @@
 <main class="iw-page" style="max-width:1080px">
     <div class="iw-mono">Step 03 · @(string.IsNullOrEmpty(Model.MoodName) ? "待 AI 判讀" : Model.MoodName)</div>
     <h1 class="iw-serif" style="margin:12px 0 6px;font-size:46px;line-height:1.1">推薦歌單</h1>
-    <div class="iw-mono" style="color:var(--accent);margin-bottom:34px">@Model.SearchKeyword</div>
+    <div class="iw-mono" style="color:var(--accent);margin-bottom:34px">
+        @Model.SearchKeyword
+        @if (Model.AnalyzedAt != null)
+        {
+            <span style="color:var(--muted)">
+                　判讀於 @Model.AnalyzedAt.Value.ToLocalTime().ToString("MM/dd HH:mm")
+            </span>
+            @* 判讀要 16–105 秒,按鈕送出後停用,避免重複點擊各打一次 AI *@
+            <form asp-action="Reanalyze" method="post" style="display:inline"
+                  onsubmit="this.querySelector('button').disabled=true;this.querySelector('button').textContent='判讀中…'">
+                <input type="hidden" name="photoId" value="@Model.PhotoId" />
+                <button type="submit" class="iw-pill" style="margin-left:10px">重新判讀</button>
+            </form>
+        }
+        @if (TempData["ReanalyzeError"] is string reanalyzeError)
+        {
+            <div style="color:var(--muted);margin-top:8px">
+                重新判讀沒有成功(@reanalyzeError),先前的判讀結果保留著。稍後可以再試一次。
+            </div>
+        }
+    </div>
 
     <div style="display:grid;grid-template-columns:340px 1fr;gap:40px;align-items:start">
         <div>

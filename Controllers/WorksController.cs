@@ -252,6 +252,7 @@ public class WorksController : Controller
             PlaylistName = string.IsNullOrEmpty(photo.Mood.MoodName)
                 ? $"作品・{DateTime.Now:MM/dd}"
                 : $"{photo.Mood.MoodName}・{DateTime.Now:MM/dd}",
+            AnalyzedAt = photo.Analysis?.AnalyzedAt,
             Songs = results.Select(r => new SongInput
             {
                 VideoId = r.VideoId,
@@ -285,6 +286,55 @@ public class WorksController : Controller
             return _analysis.ParseRaw(photo.Analysis.RawJson);
         }
 
+        var result = await CallAnalysisAsync(photo);
+        if (result is not { Ok: true })
+            return result;   // null(找不到原圖)或失敗都不寫入,下次重新整理會重試
+
+        // 指派給導覽屬性(而非只 Add),讓同一次請求後續讀 photo.Analysis 也拿得到
+        photo.Analysis = new PhotoAnalysis
+        {
+            PhotoId = photo.Id,
+            RawJson = result.RawJson,
+            Scene = result.Scene,
+            AnalyzedAt = DateTime.UtcNow,
+            ModelUsed = result.Model,
+        };
+        _db.PhotoAnalyses.Add(photo.Analysis);
+
+        try
+        {
+            await _db.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex)
+        {
+            // 「先查沒有、再插入」之間隔著 16–105 秒的 AI 呼叫。使用者等太久按 F5、
+            // 或開兩個分頁,兩個請求都會看到 null 然後都嘗試插入,第二個撞上
+            // PhotoAnalyses.PhotoId 的唯一索引。這不是錯誤狀態——另一個請求已經
+            // 把結果存好了,改用它即可,不要讓整頁 500。
+            _db.Entry(photo.Analysis).State = EntityState.Detached;
+            photo.Analysis = await _db.PhotoAnalyses.AsNoTracking()
+                .FirstOrDefaultAsync(a => a.PhotoId == photo.Id);
+
+            if (photo.Analysis == null)
+                throw;   // 不是唯一索引衝突,是別的問題,不要吞掉
+
+            _logger.LogInformation(
+                "另一個請求已存好判讀(photoId={PhotoId}),改用既有那筆。原因:{Reason}",
+                photo.Id, ex.InnerException?.Message ?? ex.Message);
+
+            return _analysis.ParseRaw(photo.Analysis.RawJson);
+        }
+
+        LogAnalysisSuccess(photo, result, "已存檔");
+        return result;
+    }
+
+    /// <summary>
+    /// 讀原圖、呼叫 AI。**不碰資料庫**——寫不寫入由呼叫端決定。
+    /// 找不到原圖回 null;判讀失敗回 Ok=false 的結果。
+    /// </summary>
+    private async Task<PhotoAnalysisResult?> CallAnalysisAsync(Photo photo)
+    {
         var fullPath = Path.Combine(_env.WebRootPath, photo.OriginalPath.TrimStart('/'));
         if (!System.IO.File.Exists(fullPath))
         {
@@ -303,56 +353,63 @@ public class WorksController : Controller
             saturation: photo.Edit?.Saturation ?? 100);
 
         if (!result.Ok)
-        {
-            // 不寫入,下次重新整理會重試。AI 掛掉不該在資料庫留下一筆空判讀擋住後續。
             _logger.LogWarning("AI 判讀失敗(photoId={PhotoId}):{Error}", photo.Id, result.Error);
-            return result;
-        }
 
-        _db.PhotoAnalyses.Add(new PhotoAnalysis
-        {
-            PhotoId = photo.Id,
-            RawJson = result.RawJson,
-            Scene = result.Scene,
-            AnalyzedAt = DateTime.UtcNow,
-            ModelUsed = result.Model,
-        });
-        await _db.SaveChangesAsync();
+        return result;
+    }
 
+    private void LogAnalysisSuccess(Photo photo, PhotoAnalysisResult result, string what)
+    {
         _logger.LogInformation(
-            "AI 判讀成功並已存檔(photoId={PhotoId},model={Model}):scene={Scene} moodPick={MoodPick} mood=[{Mood}] songs={Songs}",
+            "AI 判讀成功並{What}(photoId={PhotoId},model={Model}):scene={Scene} moodPick={MoodPick} mood=[{Mood}] songs={Songs}",
+            what,
             photo.Id,
             result.Model ?? "(未標註)",
             result.Scene,
             result.MoodPick ?? "(不在八種內)",
             string.Join('、', result.Mood),
             string.Join(" / ", result.Songs.Select(s => $"{s.Artist} - {s.Title}")));
-
-        return result;
     }
 
     /// <summary>
-    /// 使用者沒選情緒時(MoodName 是空字串哨兵值),把 AI 判的 moodPick 寫回去。
+    /// 把 AI 判的 moodPick 寫進 MoodProfile.MoodName,並標記這個值是 AI 填的。
     ///
-    /// **不覆蓋使用者自己選的**——那是他明確的意圖(設計文件 §3.2)。
+    /// 只在兩種情況寫入:情緒還沒有值,或現值本來就是 AI 填的(重新判讀時要能更新)。
+    /// **使用者自己選的永遠不動**——那是他明確的意圖(設計文件 §3.2)。
+    /// 來源靠 <see cref="MoodProfile.IsAiFilled"/> 明確記錄,不做事後推論:
+    /// prompt 在使用者有指定時會要求 AI 回同一個值,所以「值相同」對兩種來源都成立。
+    ///
     /// moodPick 一定落在 MoodKeywordMapper.AllMoods 的八種內:範圍外的值在
     /// PhotoAnalysisService.Parse 就被換成 null 了,不會流到這裡。
     ///
-    /// 補上之後影響三處:收藏櫃的書背印刷色(Index.cshtml:78-83)、
-    /// 歌單的預設名稱、以及 AI 不可用時回落的關鍵字。
+    /// 影響三處:收藏櫃的書背印刷色(Index.cshtml:78-83)、歌單的預設名稱、
+    /// 以及 AI 不可用時回落的關鍵字。
     /// </summary>
-    private async Task BackfillMoodPickAsync(Photo photo, PhotoAnalysisResult? analysis)
+    /// <returns>有沒有改動(呼叫端據此決定要不要 SaveChanges)</returns>
+    private bool ApplyMoodPick(Photo photo, PhotoAnalysisResult? analysis)
     {
         if (analysis is not { Ok: true, MoodPick: { Length: > 0 } moodPick })
-            return;
-        if (photo.Mood == null || !string.IsNullOrEmpty(photo.Mood.MoodName))
-            return;
-
-        photo.Mood.MoodName = moodPick;
-        await _db.SaveChangesAsync();
+            return false;
+        if (photo.Mood == null)
+            return false;
+        if (!string.IsNullOrEmpty(photo.Mood.MoodName) && !photo.Mood.IsAiFilled)
+            return false;
+        if (photo.Mood.MoodName == moodPick && photo.Mood.IsAiFilled)
+            return false;   // 值沒變,不必寫
 
         _logger.LogInformation(
-            "情緒未指定,以 AI 判讀的「{MoodPick}」回填(photoId={PhotoId})", moodPick, photo.Id);
+            "情緒由 AI 判讀填入「{MoodPick}」(photoId={PhotoId},原值「{Old}」)",
+            moodPick, photo.Id, photo.Mood.MoodName);
+
+        photo.Mood.MoodName = moodPick;
+        photo.Mood.IsAiFilled = true;
+        return true;
+    }
+
+    private async Task BackfillMoodPickAsync(Photo photo, PhotoAnalysisResult? analysis)
+    {
+        if (ApplyMoodPick(photo, analysis))
+            await _db.SaveChangesAsync();
     }
 
     /// <summary>
@@ -380,6 +437,50 @@ public class WorksController : Controller
         _ => "image/jpeg",
     };
 
+    // POST /Works/Reanalyze — 重新問一次 AI(改了 prompt 之後用得到)
+    //
+    // **先做完新判讀,成功才覆蓋舊的。** 不能先刪再重判:AI 會失敗
+    // (Gemini 實測回過連續半小時的 503),先刪的話使用者會同時失去舊判讀與情緒,
+    // 而且救不回來。
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Reanalyze(int photoId)
+    {
+        var photo = await _db.Photos
+            .Include(p => p.Mood)
+            .Include(p => p.Edit)       // 濾鏡與滑桿要進 prompt
+            .Include(p => p.Analysis)
+            .FirstOrDefaultAsync(p => p.Id == photoId);
+        if (photo?.Mood == null)
+            return NotFound();
+
+        var result = await CallAnalysisAsync(photo);
+        if (result is not { Ok: true })
+        {
+            // 舊判讀與情緒原封不動,使用者按了等於沒事發生
+            TempData["ReanalyzeError"] = result?.Error ?? "找不到原圖";
+            _logger.LogWarning("重新判讀失敗(photoId={PhotoId}):{Error},保留原有判讀",
+                photoId, result?.Error ?? "NO_FILE");
+            return RedirectToAction(nameof(Recommend), new { photoId });
+        }
+
+        if (photo.Analysis == null)
+        {
+            photo.Analysis = new PhotoAnalysis { PhotoId = photo.Id };
+            _db.PhotoAnalyses.Add(photo.Analysis);
+        }
+        photo.Analysis.RawJson = result.RawJson;
+        photo.Analysis.Scene = result.Scene;
+        photo.Analysis.AnalyzedAt = DateTime.UtcNow;
+        photo.Analysis.ModelUsed = result.Model;
+
+        ApplyMoodPick(photo, result);   // 只有 AI 填的情緒會被更新,使用者選的不動
+        await _db.SaveChangesAsync();
+
+        LogAnalysisSuccess(photo, result, "已覆蓋舊判讀");
+        return RedirectToAction(nameof(Recommend), new { photoId });
+    }
+
     // POST /Works/SavePlaylist — 把勾選的歌存成歌單
     [HttpPost]
     [ValidateAntiForgeryToken]
@@ -392,7 +493,15 @@ public class WorksController : Controller
             ModelState.AddModelError("", "請輸入歌單名稱。");
 
         if (!ModelState.IsValid)
+        {
+            // AnalyzedAt 沒有隱藏欄位(那是唯讀資訊,不該讓表單帶回來),
+            // 重繪前得從資料庫補回去,否則驗證失敗一次「判讀於…／重新判讀」就整組消失。
+            vm.AnalyzedAt = await _db.PhotoAnalyses
+                .Where(a => a.PhotoId == vm.PhotoId)
+                .Select(a => (DateTime?)a.AnalyzedAt)
+                .FirstOrDefaultAsync();
             return View(nameof(Recommend), vm);
+        }
 
         var playlist = new Playlist
         {

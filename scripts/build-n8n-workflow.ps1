@@ -93,10 +93,12 @@ const cleaned = raw
   .trim();
 
 try {
-  // model 放在展開之後,AI 覆寫不了。C# 存進 PhotoAnalysis.ModelUsed,日後比較模型版本用。
-  // n8n 的 Gemini 節點輸出只有 content / finishReason / index,拿不到 modelVersion,
-  // 所以由工作流自己標註——值來自產生本檔的 $modelId,與節點設定同一個來源。
-  return [{ json: { ok: true, ...JSON.parse(cleaned), model: '__MODEL_ID__' } }];
+  // ok 與 model 都放在展開之後,AI 覆寫不了。
+  // 先前寫成 { ok: true, ...JSON.parse(cleaned) },AI 只要自己回一個 "ok" 欄位
+  // 就能把成功旗標改掉——最不可信的輸入決定了成敗判準,那是反過來的。
+  // model:n8n 的 Gemini 節點輸出只有 content / finishReason / index,拿不到 modelVersion,
+  // 所以由工作流標註,值來自產生本檔的 $modelId,與節點設定同一個來源。
+  return [{ json: { ...JSON.parse(cleaned), ok: true, model: '__MODEL_ID__' } }];
 } catch (e) {
   // 不吞掉——把原文回傳,C# 端才知道是 AI 格式壞掉而非網路問題,並據此走 fallback
   return [{ json: { ok: false, error: 'PARSE_FAILED', raw } }];

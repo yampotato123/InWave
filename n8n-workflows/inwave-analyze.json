@@ -18,9 +18,9 @@
           0,
           0
         ],
-        "id": "53be5dfc-3d50-468e-889d-0e38983e4e20",
+        "id": "6cb274d7-9e4e-4efe-a56e-6bc74692de2c",
         "name": "Webhook",
-        "webhookId": "45dae680-6a71-4855-8f19-d611c6b8a06a",
+        "webhookId": "c1451746-90b7-4013-905b-badcd21156e2",
         "credentials": {
           "httpHeaderAuth": {
             "id": "GJ2pb23Tkekz89xL",
@@ -38,7 +38,7 @@
           220,
           0
         ],
-        "id": "066035ae-c904-4af0-9b8e-c6063a48e081",
+        "id": "3ded3b9c-0a26-46bc-9e71-96f28bfe400f",
         "name": "Build Prompt"
       },
       {
@@ -55,7 +55,7 @@
           440,
           0
         ],
-        "id": "d59e5115-85dd-4d1d-b282-0b48f23edaa6",
+        "id": "6530572a-5859-4ce6-ad41-0fd9e9fbd467",
         "name": "Convert to File"
       },
       {
@@ -78,7 +78,7 @@
           660,
           0
         ],
-        "id": "6b9cf8ee-f343-4c1d-98d2-7a58404cd221",
+        "id": "e767fb35-0ab3-470e-9a21-967e32875def",
         "name": "Analyze an image",
         "credentials": {
           "googlePalmApi": {
@@ -101,12 +101,12 @@
           880,
           200
         ],
-        "id": "5f9d63e1-8332-48d5-97ed-00b4b85c8c81",
+        "id": "057eb8f8-d40d-4453-89eb-6a4c745149ec",
         "name": "AI Unavailable"
       },
       {
         "parameters": {
-          "jsCode": "// Gemini 節點的輸出在 content.parts[0].text;不同版本欄位位置可能不同,故留兩條退路\nconst item = $input.first().json;\nconst raw = item?.content?.parts?.[0]?.text ?? item?.text ?? '';\n\n// 去掉 ```json ... ``` 圍欄\nconst cleaned = raw\n  .replace(/^\\s*```(?:json)?\\s*/i, '')\n  .replace(/```\\s*$/, '')\n  .trim();\n\ntry {\n  // model 放在展開之後,AI 覆寫不了。C# 存進 PhotoAnalysis.ModelUsed,日後比較模型版本用。\n  // n8n 的 Gemini 節點輸出只有 content / finishReason / index,拿不到 modelVersion,\n  // 所以由工作流自己標註——值來自產生本檔的 $modelId,與節點設定同一個來源。\n  return [{ json: { ok: true, ...JSON.parse(cleaned), model: 'models/gemini-3.6-flash' } }];\n} catch (e) {\n  // 不吞掉——把原文回傳,C# 端才知道是 AI 格式壞掉而非網路問題,並據此走 fallback\n  return [{ json: { ok: false, error: 'PARSE_FAILED', raw } }];\n}"
+          "jsCode": "// Gemini 節點的輸出在 content.parts[0].text;不同版本欄位位置可能不同,故留兩條退路\nconst item = $input.first().json;\nconst raw = item?.content?.parts?.[0]?.text ?? item?.text ?? '';\n\n// 去掉 ```json ... ``` 圍欄\nconst cleaned = raw\n  .replace(/^\\s*```(?:json)?\\s*/i, '')\n  .replace(/```\\s*$/, '')\n  .trim();\n\ntry {\n  // ok 與 model 都放在展開之後,AI 覆寫不了。\n  // 先前寫成 { ok: true, ...JSON.parse(cleaned) },AI 只要自己回一個 \"ok\" 欄位\n  // 就能把成功旗標改掉——最不可信的輸入決定了成敗判準,那是反過來的。\n  // model:n8n 的 Gemini 節點輸出只有 content / finishReason / index,拿不到 modelVersion,\n  // 所以由工作流標註,值來自產生本檔的 $modelId,與節點設定同一個來源。\n  return [{ json: { ...JSON.parse(cleaned), ok: true, model: 'models/gemini-3.6-flash' } }];\n} catch (e) {\n  // 不吞掉——把原文回傳,C# 端才知道是 AI 格式壞掉而非網路問題,並據此走 fallback\n  return [{ json: { ok: false, error: 'PARSE_FAILED', raw } }];\n}"
         },
         "type": "n8n-nodes-base.code",
         "typeVersion": 2,
@@ -114,7 +114,7 @@
           880,
           0
         ],
-        "id": "567b319f-338f-44da-a69e-1376408887d8",
+        "id": "26d8620e-14a8-4e5b-b767-8723fc9c0db6",
         "name": "Parse AI Response"
       },
       {
@@ -127,7 +127,7 @@
           1100,
           0
         ],
-        "id": "121f413b-09ff-45bd-90a4-5e8f27910d02",
+        "id": "e527862c-cbea-4523-818b-fbffbd6b6c7c",
         "name": "Respond to Webhook"
       }
     ],
