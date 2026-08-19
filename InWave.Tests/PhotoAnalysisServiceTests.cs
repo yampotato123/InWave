@@ -122,6 +122,48 @@ public class PhotoAnalysisServiceTests
     }
 
     [Fact]
+    public async Task 逾時_回TIMEOUT而不是把例外往外丟()
+    {
+        // Gemini 實測延遲 16-105 秒,逾時是常態不是例外。
+        // 這條路若丟例外,整個推薦頁會 500,而不是安靜回落到關鍵字搜尋。
+        var http = new HttpClient(new NeverRespondsHandler())
+        {
+            Timeout = TimeSpan.FromMilliseconds(300),
+        };
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["N8n:AnalyzeUrl"] = "http://n8n.test/webhook/inwave/analyze",
+            })
+            .Build();
+        var service = new PhotoAnalysisService(http, config, NullLogger<PhotoAnalysisService>.Instance);
+
+        var result = await service.AnalyzeAsync(new byte[] { 1 }, "image/jpeg", null, null, 100, 100, 100);
+
+        Assert.False(result.Ok);
+        Assert.Equal("TIMEOUT", result.Error);
+    }
+
+    [Fact]
+    public async Task 連不上n8n_回NETWORK()
+    {
+        // n8n 容器停掉時就是這條路(連線被拒)
+        var http = new HttpClient(new ThrowsHandler(new HttpRequestException("Connection refused")));
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["N8n:AnalyzeUrl"] = "http://n8n.test/webhook/inwave/analyze",
+            })
+            .Build();
+        var service = new PhotoAnalysisService(http, config, NullLogger<PhotoAnalysisService>.Instance);
+
+        var result = await service.AnalyzeAsync(new byte[] { 1 }, "image/jpeg", null, null, 100, 100, 100);
+
+        Assert.False(result.Ok);
+        Assert.Equal("NETWORK", result.Error);
+    }
+
+    [Fact]
     public async Task HTTP錯誤_錯誤碼帶上狀態碼()
     {
         var result = await AnalyzeAsync(HttpStatusCode.Forbidden, "Authorization data is wrong!");
@@ -185,6 +227,28 @@ public class PhotoAnalysisServiceTests
         Assert.Contains("\"filter\":", handler.LastRequestBody);
         Assert.Contains("\"brightness\":130", handler.LastRequestBody);
         Assert.Equal("test-token", handler.LastToken);
+    }
+
+    /// <summary>永遠不回應,用來觸發 HttpClient 的逾時。</summary>
+    private sealed class NeverRespondsHandler : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            throw new InvalidOperationException("不會執行到這裡");
+        }
+    }
+
+    /// <summary>丟出指定例外,模擬連線層失敗。</summary>
+    private sealed class ThrowsHandler : HttpMessageHandler
+    {
+        private readonly Exception _ex;
+
+        public ThrowsHandler(Exception ex) => _ex = ex;
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken) => Task.FromException<HttpResponseMessage>(_ex);
     }
 
     /// <summary>固定回應的假 handler,順便記下送出去的內容供斷言。</summary>
