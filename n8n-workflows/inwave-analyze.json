@@ -18,9 +18,9 @@
           0,
           0
         ],
-        "id": "6cb274d7-9e4e-4efe-a56e-6bc74692de2c",
+        "id": "9cd0926b-f58a-494d-9bfd-848ff42a9872",
         "name": "Webhook",
-        "webhookId": "c1451746-90b7-4013-905b-badcd21156e2",
+        "webhookId": "9976849b-845f-414e-9db7-cc8427236b2c",
         "credentials": {
           "httpHeaderAuth": {
             "id": "GJ2pb23Tkekz89xL",
@@ -38,7 +38,7 @@
           220,
           0
         ],
-        "id": "3ded3b9c-0a26-46bc-9e71-96f28bfe400f",
+        "id": "ba1deb42-535d-4653-9ff8-81b4df163bea",
         "name": "Build Prompt"
       },
       {
@@ -55,7 +55,7 @@
           440,
           0
         ],
-        "id": "6530572a-5859-4ce6-ad41-0fd9e9fbd467",
+        "id": "47a8abf1-4a3f-47c8-9cde-1d57b031d224",
         "name": "Convert to File"
       },
       {
@@ -64,31 +64,34 @@
           "operation": "analyze",
           "modelId": {
             "__rl": true,
-            "value": "models/gemini-3.6-flash",
-            "mode": "list",
-            "cachedResultName": "models/gemini-3.6-flash"
+            "value": "gpt-4o",
+            "mode": "id"
           },
           "text": "={{ $('Build Prompt').item.json.prompt }}",
-          "inputType": "binary",
-          "options": {}
+          "inputType": "base64",
+          "binaryPropertyName": "data",
+          "simplify": false,
+          "options": {
+            "maxTokens": 1000
+          }
         },
-        "type": "@n8n/n8n-nodes-langchain.googleGemini",
-        "typeVersion": 1.2,
+        "type": "@n8n/n8n-nodes-langchain.openAi",
+        "typeVersion": 2.3,
         "position": [
           660,
           0
         ],
-        "id": "e767fb35-0ab3-470e-9a21-967e32875def",
+        "id": "6d376069-08bb-4aee-9de0-81e8c548f643",
         "name": "Analyze an image",
         "credentials": {
-          "googlePalmApi": {
-            "id": "kHlYboN0UiZaTmnV",
-            "name": "Google Gemini(PaLM) Api account"
+          "openAiApi": {
+            "id": "GtmEBsimCNj1bE2S",
+            "name": "OpenAI InWave"
           }
         },
         "retryOnFail": true,
-        "maxTries": 3,
-        "waitBetweenTries": 5000,
+        "maxTries": 2,
+        "waitBetweenTries": 3000,
         "onError": "continueErrorOutput"
       },
       {
@@ -101,12 +104,12 @@
           880,
           200
         ],
-        "id": "057eb8f8-d40d-4453-89eb-6a4c745149ec",
+        "id": "42615ea1-7729-475f-bf92-6b71c394fb85",
         "name": "AI Unavailable"
       },
       {
         "parameters": {
-          "jsCode": "// Gemini 節點的輸出在 content.parts[0].text;不同版本欄位位置可能不同,故留兩條退路\nconst item = $input.first().json;\nconst raw = item?.content?.parts?.[0]?.text ?? item?.text ?? '';\n\n// 去掉 ```json ... ``` 圍欄\nconst cleaned = raw\n  .replace(/^\\s*```(?:json)?\\s*/i, '')\n  .replace(/```\\s*$/, '')\n  .trim();\n\ntry {\n  // ok 與 model 都放在展開之後,AI 覆寫不了。\n  // 先前寫成 { ok: true, ...JSON.parse(cleaned) },AI 只要自己回一個 \"ok\" 欄位\n  // 就能把成功旗標改掉——最不可信的輸入決定了成敗判準,那是反過來的。\n  // model:n8n 的 Gemini 節點輸出只有 content / finishReason / index,拿不到 modelVersion,\n  // 所以由工作流標註,值來自產生本檔的 $modelId,與節點設定同一個來源。\n  return [{ json: { ...JSON.parse(cleaned), ok: true, model: 'models/gemini-3.6-flash' } }];\n} catch (e) {\n  // 不吞掉——把原文回傳,C# 端才知道是 AI 格式壞掉而非網路問題,並據此走 fallback\n  return [{ json: { ok: false, error: 'PARSE_FAILED', raw } }];\n}"
+          "jsCode": "// 不同供應商的回應形狀不同,依序試。多留幾條退路的成本很低,\n// 而猜錯的代價是「模型明明回答了,我們卻當成沒有」。\nconst item = $input.first().json;\n\nconst openAiText = Array.isArray(item?.output)\n  ? item.output\n      .flatMap(o => Array.isArray(o?.content) ? o.content : [])\n      .map(c => c?.text)\n      .find(t => typeof t === 'string' && t.length > 0)\n  : undefined;\n\nconst raw =\n  openAiText                          // OpenAI Responses API(simplify 關掉時的完整回應)\n  ?? item?.content?.parts?.[0]?.text  // Gemini\n  ?? item?.output_text\n  ?? item?.text\n  ?? '';\n\n// 去掉 ```json ... ``` 圍欄\nconst cleaned = raw\n  .replace(/^\\s*```(?:json)?\\s*/i, '')\n  .replace(/```\\s*$/, '')\n  .trim();\n\ntry {\n  // ok 與 model 都放在展開之後,AI 覆寫不了。\n  // 先前寫成 { ok: true, ...JSON.parse(cleaned) },AI 只要自己回一個 \"ok\" 欄位\n  // 就能把成功旗標改掉——最不可信的輸入決定了成敗判準,那是反過來的。\n  // model:n8n 的 Gemini 節點輸出只有 content / finishReason / index,拿不到 modelVersion,\n  // 所以由工作流標註,值來自產生本檔的 $modelId,與節點設定同一個來源。\n  return [{ json: { ...JSON.parse(cleaned), ok: true, model: 'gpt-4o' } }];\n} catch (e) {\n  // 不吞掉——把原文回傳,C# 端才知道是 AI 格式壞掉而非網路問題,並據此走 fallback\n  return [{ json: { ok: false, error: 'PARSE_FAILED', raw } }];\n}"
         },
         "type": "n8n-nodes-base.code",
         "typeVersion": 2,
@@ -114,7 +117,7 @@
           880,
           0
         ],
-        "id": "26d8620e-14a8-4e5b-b767-8723fc9c0db6",
+        "id": "63894deb-e419-46e2-be30-c45148d98407",
         "name": "Parse AI Response"
       },
       {
@@ -127,7 +130,7 @@
           1100,
           0
         ],
-        "id": "e527862c-cbea-4523-818b-fbffbd6b6c7c",
+        "id": "b5cc9007-1d8d-4e05-8bc5-6a1155e77793",
         "name": "Respond to Webhook"
       }
     ],
@@ -136,9 +139,9 @@
         "main": [
           [
             {
+              "index": 0,
               "type": "main",
-              "node": "Build Prompt",
-              "index": 0
+              "node": "Build Prompt"
             }
           ]
         ]
@@ -147,9 +150,9 @@
         "main": [
           [
             {
+              "index": 0,
               "type": "main",
-              "node": "Convert to File",
-              "index": 0
+              "node": "Convert to File"
             }
           ]
         ]
@@ -158,9 +161,9 @@
         "main": [
           [
             {
+              "index": 0,
               "type": "main",
-              "node": "Analyze an image",
-              "index": 0
+              "node": "Analyze an image"
             }
           ]
         ]
@@ -169,16 +172,16 @@
         "main": [
           [
             {
+              "index": 0,
               "type": "main",
-              "node": "Parse AI Response",
-              "index": 0
+              "node": "Parse AI Response"
             }
           ],
           [
             {
+              "index": 0,
               "type": "main",
-              "node": "AI Unavailable",
-              "index": 0
+              "node": "AI Unavailable"
             }
           ]
         ]
@@ -187,9 +190,9 @@
         "main": [
           [
             {
+              "index": 0,
               "type": "main",
-              "node": "Respond to Webhook",
-              "index": 0
+              "node": "Respond to Webhook"
             }
           ]
         ]
@@ -198,9 +201,9 @@
         "main": [
           [
             {
+              "index": 0,
               "type": "main",
-              "node": "Respond to Webhook",
-              "index": 0
+              "node": "Respond to Webhook"
             }
           ]
         ]

@@ -50,6 +50,67 @@ AI 掛掉時功能不會消失。回落有兩層，都經過實測（不是只�
     → 存成歌單
 ```
 
+## 更新（2026-08-20）：AI 供應商由 Gemini 換成 OpenAI
+
+**起因**：Gemini 免費額度用完（`The service is receiving too many requests from you`），
+使用者購買 OpenAI 額度。**程式碼一行未改** —— 供應商是工作流的實作細節，
+這正是當初「AI 判讀放 n8n 不放 C#」那個決策的回報。
+
+| | 之前 | 現在 |
+|---|---|---|
+| 節點 | `googleGemini` v1.2 | `openAi` v2.3（`image` / `analyze`）|
+| 模型 | `models/gemini-3.6-flash` | `gpt-4o`（改 `$modelId` 一行即可換）|
+| 延遲 | 16–105 秒 | **8–11 秒** |
+| 重試 | 3 次 | 2 次（理由見下）|
+
+### 換節點時查到、也差點踩到的三個預設值
+
+**不是憑印象填參數**——直接讀 n8n 容器裡的節點定義（`analyze.operation.js`）確認：
+
+1. **`inputType` 預設是 `url`**（要圖片網址）。我們送的是 `Convert to File` 產生的 binary，
+   不改成 `base64` + `binaryPropertyName: data` 會直接失敗。
+2. **`maxTokens` 預設只有 300**。我們要的 JSON（場景 + 五首歌 + 兩個陣列）會被截斷，
+   然後 Parse 失敗回 `PARSE_FAILED`——**症狀看起來像模型不聽話，其實是被切掉**。已設 1000。
+3. **`simplify` 預設 true**，只回 `response.output`（陣列）。關掉拿完整回應，
+   Parse 節點才有穩定路徑。
+
+`modelId` 是 resourceLocator，用 `mode: 'id'` 給純字串最穩，匯出入不會走樣。
+
+### Parse 節點改成供應商無關
+
+回應形狀依序試：OpenAI Responses 的 `output[].content[].text` → Gemini 的
+`content.parts[0].text` → `output_text` → `text`。多留退路的成本很低，
+猜錯的代價是「模型明明回答了，我們卻當成沒有」。
+
+### 重試從 3 次降到 2 次
+
+n8n 的重試**不能依狀態碼區分**。額度或速率問題（429）重試只會燒更快、
+讓使用者多等一倍——8/19 Gemini 那晚就是這樣加速燒完的。
+真要條件式重試（503 才重試、429 直接放棄），得把呼叫改寫進 Code 節點自己打 HTTP，
+目前不值得。
+
+### 實測
+
+```
+webhook 直打   8 秒   ok:true  model=gpt-4o  moodPick=懷舊（落在八種內）
+完整流程       11 秒  scene=海邊飛鳥剪影  moodPick=夢幻  情緒自動回填
+YouTube 解析   5/5 全中,都落在官方或 Topic 頻道
+```
+
+`ok` 與 `model` 出現在回應 JSON 的**尾端**，證明「展開順序」那個修正有生效
+（AI 覆寫不了成功旗標）。
+
+### 待觀察
+
+**prompt v4 是對 Gemini 調出來的**，六條規則各自對應一個 Gemini 實測發現的問題。
+換到 gpt-4o 後第一次觀察：五首中有一首（`Angèle - La Thune`）與「海邊飛鳥剪影」
+的關聯較弱。還不確定是模型差異還是單次抽樣，**多跑幾張再決定要不要調 prompt**。
+
+n8n 憑證裡有一把多餘的空殼 `OpenAI account`（點 Analyze image 時順手建的），
+可在 UI 刪掉。
+
+---
+
 ## 更新（2026-08-19）：金鑰改成隨時可換（維護性）
 
 **問題**：換 YouTube 金鑰或 webhook token 要 `docker compose up -d` 重建容器 ——

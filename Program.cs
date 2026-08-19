@@ -26,8 +26,9 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // YouTubeService 需要 HttpClient,用 typed client 註冊
 builder.Services.AddHttpClient<IYouTubeService, YouTubeService>();
 
-// AI 判讀照片(n8n → Gemini)。實測延遲 16–105 秒且落差很大,預設 30 秒會誤殺,
-// 所以拉到 120 秒;超過就當它掛了,由呼叫端走 MoodKeywordMapper fallback。
+// AI 判讀照片(n8n → 視覺模型)。實測延遲:OpenAI 約 8–11 秒,先前的 Gemini 是 16–105 秒。
+// 上限抓 120 秒是為了容納最慢的情況,換供應商不必跟著調;
+// 超過就當它掛了,由呼叫端走 MoodKeywordMapper fallback。
 builder.Services.AddHttpClient<IPhotoAnalysisService, PhotoAnalysisService>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(

@@ -82,9 +82,23 @@ return [{ json: { body: b, prompt: p } }];
 
 # --- 節點 5：parse（照筆記 §1 節點 4 原文，不吞錯） ---
 $parseCode = @'
-// Gemini 節點的輸出在 content.parts[0].text;不同版本欄位位置可能不同,故留兩條退路
+// 不同供應商的回應形狀不同,依序試。多留幾條退路的成本很低,
+// 而猜錯的代價是「模型明明回答了,我們卻當成沒有」。
 const item = $input.first().json;
-const raw = item?.content?.parts?.[0]?.text ?? item?.text ?? '';
+
+const openAiText = Array.isArray(item?.output)
+  ? item.output
+      .flatMap(o => Array.isArray(o?.content) ? o.content : [])
+      .map(c => c?.text)
+      .find(t => typeof t === 'string' && t.length > 0)
+  : undefined;
+
+const raw =
+  openAiText                          // OpenAI Responses API(simplify 關掉時的完整回應)
+  ?? item?.content?.parts?.[0]?.text  // Gemini
+  ?? item?.output_text
+  ?? item?.text
+  ?? '';
 
 // 去掉 ```json ... ``` 圍欄
 const cleaned = raw
@@ -105,10 +119,12 @@ try {
 }
 '@
 
-# 模型選擇理由見 notes/2026-08-11-spike-AI推薦流程.md §六-3
-# (live / image / tts / embedding 那幾類都不能選)。
-# 這個變數同時餵給 Gemini 節點與 Parse 節點回傳的 model 欄位,只有一個來源。
-$modelId = 'models/gemini-3.6-flash'
+# 2026-08-20 由 Gemini 改為 OpenAI(使用者購買了 OpenAI 額度)。
+# 這個變數同時餵給節點設定與 Parse 節點回傳的 model 欄位,只有一個來源。
+#
+# gpt-4o 是 n8n 這顆節點自己的預設值,拿來當起點。要換模型改這一行就好,
+# 或在 n8n UI 的 Model 下拉選(那裡列的是你帳號實際可用的清單)。
+$modelId = 'gpt-4o'
 $parseCode = $parseCode.Replace('__MODEL_ID__', $modelId)
 
 $wf = [ordered]@{
@@ -156,27 +172,36 @@ $wf = [ordered]@{
       parameters = [ordered]@{
         resource  = 'image'
         operation = 'analyze'
-        modelId   = [ordered]@{
-          '__rl'           = $true
-          value            = $modelId
-          mode             = 'list'
-          cachedResultName = $modelId
-        }
+        # resourceLocator:用 id 模式給純字串,不需要 cachedResultName,匯出入也不會走樣
+        modelId   = [ordered]@{ '__rl' = $true; value = $modelId; mode = 'id' }
         text      = "={{ `$('Build Prompt').item.json.prompt }}"
-        inputType = 'binary'
-        options   = @{}
+        # 預設是 'url'(要圖片網址)。我們送的是 Convert to File 產生的 binary,
+        # 欄位名 data——這兩個不改會直接失敗。
+        inputType          = 'base64'
+        binaryPropertyName = 'data'
+        # simplify 預設 true,只回 response.output(陣列)。關掉拿完整回應,
+        # Parse 節點才有穩定的路徑可走。
+        simplify  = $false
+        options   = [ordered]@{
+          # **預設只有 300**。我們要的 JSON(場景 + 五首歌 + 兩個陣列)會被截斷,
+          # 然後 Parse 失敗回 PARSE_FAILED——症狀看起來像模型不聽話,其實是被切掉。
+          maxTokens = 1000
+        }
       }
-      type        = '@n8n/n8n-nodes-langchain.googleGemini'
-      typeVersion = 1.2
+      type        = '@n8n/n8n-nodes-langchain.openAi'
+      typeVersion = 2.3
       position    = @(660, 0)
       id          = [guid]::NewGuid().ToString()
       name        = 'Analyze an image'
-      credentials = @{ googlePalmApi = [ordered]@{ id = 'kHlYboN0UiZaTmnV'; name = 'Google Gemini(PaLM) Api account' } }
-      # Gemini 會回 503「high demand」（2026-08-19 實測連三次）。重試三次，
-      # 仍失敗就走錯誤輸出，絕不讓 webhook 回 200 空 body。
+      credentials = @{ openAiApi = [ordered]@{ id = 'GtmEBsimCNj1bE2S'; name = 'OpenAI InWave' } }
+      # 供應商暫時性故障時重試一次;仍失敗就走錯誤輸出,絕不讓 webhook 回 200 空 body。
+      #
+      # 為什麼從 3 次降到 2 次:n8n 的重試**不能依狀態碼區分**。額度或速率問題(429)
+      # 重試只會燒更快、讓使用者多等一倍——2026-08-19 Gemini 那晚就是這樣加速燒完的。
+      # 真要條件式重試,得把呼叫改寫進 Code 節點自己打 HTTP,目前不值得。
       retryOnFail      = $true
-      maxTries         = 3
-      waitBetweenTries = 5000
+      maxTries         = 2
+      waitBetweenTries = 3000
       onError          = 'continueErrorOutput'
     },
     [ordered]@{

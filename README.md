@@ -5,7 +5,7 @@
 上傳照片、選情緒、修圖，由視覺模型判讀照片氣氛並推薦歌曲，存成可播放的作品收藏。
 
 技術:ASP.NET Core MVC (.NET 10) + EF Core 10 + SQLite + YouTube Data API v3
-+ Docker Compose + n8n + Google Gemini
++ Docker Compose + n8n + OpenAI(視覺模型)
 
 ---
 
@@ -21,7 +21,7 @@ InWave (容器)  ────────────────┐
 n8n (容器)                YouTube Data API
   │ POST 圖 + prompt
   ▼
-Google Gemini
+OpenAI(視覺模型)
 ```
 
 三個服務由一份 `docker-compose.yml` 起，容器間以**服務名稱**互連（`http://n8n:5678`）。
@@ -156,7 +156,7 @@ dotnet user-secrets set "YouTube:ApiKey" "你的key"
 |---|---|---|
 | `N8n:AnalyzeUrl` | `http://localhost:5678/webhook/inwave/analyze` | 容器內要改成 `http://n8n:5678/...`,已由 `docker-compose.yml` 覆寫 |
 | `N8n:Token` | 空 | n8n Webhook 節點的 Header Auth token,送出時放在 `X-InWave-Token` |
-| `N8n:TimeoutSeconds` | 120 | 實測 Gemini 延遲 16–105 秒落差很大,設 30 秒會誤殺 |
+| `N8n:TimeoutSeconds` | 120 | 實測延遲:OpenAI 約 8–11 秒,先前的 Gemini 是 16–105 秒。上限抓寬,換供應商不必跟著調 |
 
 ### 金鑰放哪裡、怎麼換
 
@@ -179,7 +179,7 @@ dotnet user-secrets set "N8n:Token"      "你的token"
 |---|---|---|
 | user-secrets | 開發機（本機 F5 與容器共用） | 幾秒內生效 |
 | `.env` 的 `YOUTUBE_API_KEY` / `N8N_WEBHOOK_TOKEN` | 沒有 user-secrets 時的退路 | 要 `docker compose up -d` 重建容器 |
-| n8n UI → Credentials | Gemini 金鑰、webhook 的 Header Auth | 存檔即生效 |
+| n8n UI → Credentials | AI 供應商金鑰、webhook 的 Header Auth | 存檔即生效 |
 
 ⚠️ **webhook token 兩端都要改**：n8n 的 Header Auth 憑證與 user-secrets 必須一致，
 只改一邊會得到 403。改完用 `scripts/test-n8n-webhook.ps1` 驗證（回 403 就是不一致）。
