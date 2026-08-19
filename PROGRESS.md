@@ -50,6 +50,46 @@ AI 掛掉時功能不會消失。回落有兩層，都經過實測（不是只�
     → 存成歌單
 ```
 
+## 更新（2026-08-19）：金鑰改成隨時可換（維護性）
+
+**問題**：換 YouTube 金鑰或 webhook token 要 `docker compose up -d` 重建容器 ——
+環境變數在容器建立時就固定了，連 `docker restart` 都讀不到新值。這不叫「隨時可換」。
+
+**改法**：金鑰一律放 **user-secrets**，本機 F5 與容器共用同一份。
+
+```
+Program.cs   AddJsonFile("secrets/secrets.json", optional: true, reloadOnChange: true)
+override.yml %APPDATA%/Microsoft/UserSecrets/<UserSecretsId> → /app/secrets（唯讀）
+```
+
+容器本身讀不到 user-secrets（檔案在主機的 `%APPDATA%`，而且那個組態來源只在
+Development 環境才會加入），所以把目錄掛進去，當成一般 JSON 組態檔讀。
+
+**實測熱重載**：容器 `Up 57 minutes` 全程未重啟 —— 先把 token 改錯 → log 出現
+`HTTP_403`；再用 `dotnet user-secrets set` 改回正確值 → 下一個請求沒有新的 403，
+直接打到 n8n。
+
+### 兩個踩到的坑
+
+1. **`reloadOnChange` 在掛載的檔案上預設無效**。第一次測時檔案內容在容器裡確實變了，
+   但應用程式沒重讀（`HTTP_403` 出現 0 次）——掛載進容器的檔案**不傳遞 inotify 事件**
+   （Windows→Linux bind mount、Kubernetes Secret volume 都一樣），監看器永遠不會觸發。
+   加 `DOTNET_USE_POLLING_FILE_WATCHER=true` 改成輪詢才會動。
+2. **測試時把 token 覆蓋掉，而 `.env` 那份已先清空**，一度只剩 n8n 加密憑證庫裡有。
+   用 `n8n export:credentials --decrypted` 取回（過程不印出值，用完即刪匯出檔）。
+   **教訓：改動唯一一份金鑰之前先確認還有第二個來源。**
+
+### 正式部署的分層（這次一併釐清）
+
+`docker-compose.yml` 是正式部署也能直接用的基礎設定；user-secrets 的掛載搬到
+`docker-compose.override.yml`（compose 會自動疊上，正式部署用 `-f docker-compose.yml` 排除）。
+
+正式環境改由環境變數，或由平台的 secret volume 掛到同一個 `/app/secrets`。
+**掛檔案的機制在正式環境更適用**——Kubernetes Secret 輪替時檔案原地更新，
+配上輪詢就不必重啟 Pod；環境變數做不到這件事。
+
+---
+
 ## 更新（2026-08-19）：Code review 找到 6 個真問題，全數修掉
 
 派了兩個獨立審查（一個看未提交的變更，一個看整包 AI 管線）。**六個發現全部成立**，

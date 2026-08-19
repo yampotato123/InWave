@@ -4,6 +4,20 @@ using InWave.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// 掛進來的金鑰檔。優先權最高,蓋過 appsettings.json 與環境變數;檔案不存在就跳過。
+//
+// 誰負責放這個檔,依環境而異——**程式碼不必知道差別**:
+//   開發機   docker-compose.override.yml 把 user-secrets 目錄唯讀掛到 /app/secrets,
+//            所以容器與本機 F5 共用同一份金鑰(容器讀不到 user-secrets:檔案在主機的
+//            %APPDATA%,而且那個組態來源只在 Development 環境才會被加入)
+//   正式環境 平台的 secret volume 掛到同一個路徑(Kubernetes Secret、
+//            Azure Container Apps 的 secret 掛載都是檔案),或什麼都不掛,改用環境變數
+//
+// 為什麼用檔案而不是只用環境變數:**環境變數換不了**。它在容器建立時就固定,
+// 連 docker restart 都讀不到新值,要換金鑰得重建容器。檔案來源支援熱重載,
+// 所以換金鑰存檔即生效——正式環境輪替金鑰時,Secret volume 原地更新即可,不必重啟。
+builder.Configuration.AddJsonFile("secrets/secrets.json", optional: true, reloadOnChange: true);
+
 builder.Services.AddControllersWithViews();
 
 builder.Services.AddDbContext<AppDbContext>(options =>

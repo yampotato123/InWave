@@ -158,13 +158,52 @@ dotnet user-secrets set "YouTube:ApiKey" "你的key"
 | `N8n:Token` | 空 | n8n Webhook 節點的 Header Auth token,送出時放在 `X-InWave-Token` |
 | `N8n:TimeoutSeconds` | 120 | 實測 Gemini 延遲 16–105 秒落差很大,設 30 秒會誤殺 |
 
-```powershell
-# 本機 F5:token 放 user-secrets
-dotnet user-secrets set "N8n:Token" "你的token"
+### 金鑰放哪裡、怎麼換
 
-# 容器:放專案根目錄的 .env(已被 .gitignore 擋住)
-# N8N_WEBHOOK_TOKEN=你的token
+**一律放 user-secrets，本機與容器共用同一份。**
+
+```powershell
+dotnet user-secrets set "YouTube:ApiKey" "你的key"
+dotnet user-secrets set "N8n:Token"      "你的token"
 ```
+
+容器讀得到，是因為 `docker-compose.override.yml` 把本專案的 user-secrets 目錄
+**唯讀掛**到 `/app/secrets`，`Program.cs` 再把它當成一般 JSON 組態檔讀進來
+（容器本身讀不到 user-secrets：檔案在主機的 `%APPDATA%`，而且那個組態來源
+只在 Development 環境才會被加入）。
+
+**換金鑰不必重啟，也不必重建容器** —— 執行上面的指令，幾秒後就生效。
+實測：容器連續執行 57 分鐘不動，途中換掉 token，下一個請求就用新值。
+
+| 位置 | 用途 | 換了之後 |
+|---|---|---|
+| user-secrets | 開發機（本機 F5 與容器共用） | 幾秒內生效 |
+| `.env` 的 `YOUTUBE_API_KEY` / `N8N_WEBHOOK_TOKEN` | 沒有 user-secrets 時的退路 | 要 `docker compose up -d` 重建容器 |
+| n8n UI → Credentials | Gemini 金鑰、webhook 的 Header Auth | 存檔即生效 |
+
+⚠️ **webhook token 兩端都要改**：n8n 的 Header Auth 憑證與 user-secrets 必須一致，
+只改一邊會得到 403。改完用 `scripts/test-n8n-webhook.ps1` 驗證（回 403 就是不一致）。
+
+⚠️ **因外洩而換金鑰時**，記得去原廠停用舊的，否則舊金鑰仍然可用。
+
+### 正式部署
+
+`docker-compose.yml` 是正式部署也能直接用的基礎設定；user-secrets 的掛載在
+`docker-compose.override.yml`，那是開發機專屬的（依賴 Windows 的 `%APPDATA%`）。
+部署時**排除** override：
+
+```powershell
+docker compose -f docker-compose.yml up -d
+```
+
+金鑰改由環境變數，或由平台的 secret volume 掛到同一個 `/app/secrets` 路徑
+（Kubernetes Secret、Azure Container Apps 的 secret 掛載都是檔案）。
+掛檔案的好處是**輪替金鑰不必重啟**——與開發機同一套機制，程式碼不必知道差別。
+
+> `DOTNET_USE_POLLING_FILE_WATCHER=true` 不能拿掉。掛載進容器的檔案**不會傳遞
+> inotify 事件**（Windows→Linux 的 bind mount、Kubernetes 的 Secret volume 都一樣），
+> 預設的檔案監看器永遠不會被觸發，換了金鑰也不會生效。這點實測過確實不會，
+> 改成輪詢才會動。
 
 n8n 那端的工作流定義在 `n8n-workflows/inwave-analyze.json`,
 由 `scripts/build-n8n-workflow.ps1` 產生。匯入與驗證方式見該腳本開頭的註解,

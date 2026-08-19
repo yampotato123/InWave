@@ -35,6 +35,13 @@ services:
       # UseExceptionHandler 與 UseHsts。要看詳細錯誤頁時改成 Development。
       - ASPNETCORE_ENVIRONMENT=Production
 
+      # 讓 reloadOnChange 在掛載的金鑰檔上真的有效。
+      # 預設的檔案監看走 inotify,而**掛載進容器的檔案不會傳遞 inotify 事件**
+      # (Windows→Linux 的 bind mount、Kubernetes 的 Secret volume 都一樣),
+      # 監看器永遠不會被觸發,換了金鑰也不會生效——實測過,確實不會。
+      # 改成輪詢(約每 4 秒看一次檔案時間)就會動。成本是一個小檔案的 stat。
+      - DOTNET_USE_POLLING_FILE_WATCHER=true
+
       # 資料庫檔案放在 /app/docker-data,由下面的 volume 掛到你的硬碟。
       # 冒號在環境變數裡要寫成雙底線:ConnectionStrings:DefaultConnection
       - ConnectionStrings__DefaultConnection=Data Source=/app/docker-data/mymusicbuddy.db
@@ -47,7 +54,8 @@ services:
       # AI 判讀:容器之間用服務名稱互連,localhost 在容器裡指容器自己。
       # 本機 F5(5120)不吃這一段,走 appsettings.json 的 http://localhost:5678。
       - N8n__AnalyzeUrl=http://n8n:5678/webhook/inwave/analyze
-      # webhook 的 Header Auth token,同樣放 .env。沒設的話 n8n 會回 403。
+      # webhook 的 Header Auth token。優先讀掛進來的 user-secrets(見下方 volumes),
+      # 這裡只是沒有 user-secrets 時的退路。
       - N8n__Token=${N8N_WEBHOOK_TOKEN:-}
 
     volumes:
@@ -59,6 +67,11 @@ services:
       # 結果是把資料庫掛進原始碼目錄。Linux 上不會發生,所以很難事後發現。
       - ./docker-data:/app/docker-data          # SQLite 資料庫
       - ./wwwroot/uploads:/app/wwwroot/uploads  # 使用者上傳的照片
+
+      # 金鑰不掛在這裡。本檔是**正式部署也能直接用**的基礎設定,
+      # 金鑰由環境變數(上方)或平台的 secret volume 掛到 /app/secrets 提供。
+      # 開發機從 user-secrets 讀的那個掛載在 docker-compose.override.yml,
+      # compose 會自動疊上去,正式部署時用 `-f docker-compose.yml` 排除它。
 
   # n8n:工作流自動化。階段 3 會用它跑 AI 判讀照片。
   #

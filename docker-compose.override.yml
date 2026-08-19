@@ -1,0 +1,23 @@
+# 開發機專屬的疊加設定。
+#
+# `docker compose up` 會自動把這個檔疊在 docker-compose.yml 之上,不必指定 -f。
+# 正式部署要**排除**它:
+#
+#     docker compose -f docker-compose.yml up -d
+#
+# 為什麼分開:docker-compose.yml 是正式部署也能直接用的基礎設定,
+# 而下面這個掛載依賴 Windows 的 %APPDATA% 與 .NET 的 user-secrets——
+# 那是開發機才有的東西,寫進基礎檔會讓正式部署失敗。
+
+services:
+  inwave:
+    volumes:
+      # 把本專案的 user-secrets 目錄唯讀掛進 /app/secrets,
+      # 讓容器與本機 F5(5120)共用同一份金鑰,只要維護一個地方。
+      #
+      # 路徑最後那段是 InWave.csproj 的 <UserSecretsId>。
+      # 唯讀(:ro):容器不該有機會改動主機上的金鑰。
+      #
+      # Program.cs 以 optional + reloadOnChange 讀 /app/secrets/secrets.json,
+      # 所以 `dotnet user-secrets set` 之後**存檔即生效**,不必重啟或重建容器。
+      - ${APPDATA}/Microsoft/UserSecrets/23d905ff-b3e8-4062-88ce-cfa5c7e6c3d9:/app/secrets:ro
