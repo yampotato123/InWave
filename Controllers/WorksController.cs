@@ -23,13 +23,22 @@ public class WorksController : Controller
 
     private readonly AppDbContext _db;
     private readonly IYouTubeService _youtube;
+    private readonly IPhotoAnalysisService _analysis;
     private readonly IWebHostEnvironment _env;
+    private readonly ILogger<WorksController> _logger;
 
-    public WorksController(AppDbContext db, IYouTubeService youtube, IWebHostEnvironment env)
+    public WorksController(
+        AppDbContext db,
+        IYouTubeService youtube,
+        IPhotoAnalysisService analysis,
+        IWebHostEnvironment env,
+        ILogger<WorksController> logger)
     {
         _db = db;
         _youtube = youtube;
+        _analysis = analysis;
         _env = env;
+        _logger = logger;
     }
 
     // GET /Works — 我的作品列表
@@ -200,6 +209,11 @@ public class WorksController : Controller
         if (photo?.Mood == null)
             return NotFound();
 
+        // 階段 3 步驟 2:只驗管線——呼叫 AI 並寫進 log,推薦邏輯維持原樣。
+        // 步驟 3 會把結果存進 PhotoAnalysis(現在每次重新整理都會重打一次 AI),
+        // 步驟 4 才改成用 AI 推的歌去搜 YouTube。
+        await LogAnalysisAsync(photo);
+
         var keyword = MoodKeywordMapper.GetKeyword(photo.Mood.MoodName, photo.Edit?.FilterName);
         var results = await _youtube.SearchAsync(keyword);
 
@@ -224,6 +238,52 @@ public class WorksController : Controller
         };
         return View(vm);
     }
+
+    /// <summary>
+    /// 階段 3 步驟 2 的暫時性驗證:把照片送給 n8n 判讀,結果只寫 log 不影響畫面。
+    /// 送的是原圖(OriginalPath),不是 EditedPath——濾鏡以文字進入 prompt,
+    /// 送合成圖會讓濾鏡被算兩次(設計文件 §3.2)。
+    /// </summary>
+    private async Task LogAnalysisAsync(Photo photo)
+    {
+        var fullPath = Path.Combine(_env.WebRootPath, photo.OriginalPath.TrimStart('/'));
+        if (!System.IO.File.Exists(fullPath))
+        {
+            _logger.LogWarning("AI 判讀略過:找不到原圖 {Path}", fullPath);
+            return;
+        }
+
+        var result = await _analysis.AnalyzeAsync(
+            imageBytes: await System.IO.File.ReadAllBytesAsync(fullPath),
+            mimeType: MimeTypeOf(fullPath),
+            // MoodName 用空字串當「未指定」的哨兵值(2026-08-17 定案,零 migration)
+            mood: string.IsNullOrEmpty(photo.Mood!.MoodName) ? null : photo.Mood.MoodName,
+            filter: photo.Edit?.FilterName,
+            brightness: photo.Edit?.Brightness ?? 100,
+            contrast: photo.Edit?.Contrast ?? 100,
+            saturation: photo.Edit?.Saturation ?? 100);
+
+        if (!result.Ok)
+        {
+            _logger.LogWarning("AI 判讀失敗(photoId={PhotoId}):{Error}", photo.Id, result.Error);
+            return;
+        }
+
+        _logger.LogInformation(
+            "AI 判讀成功(photoId={PhotoId}):scene={Scene} moodPick={MoodPick} mood=[{Mood}] songs={Songs}",
+            photo.Id,
+            result.Scene,
+            result.MoodPick ?? "(不在八種內)",
+            string.Join('、', result.Mood),
+            string.Join(" / ", result.Songs.Select(s => $"{s.Artist} - {s.Title}")));
+    }
+
+    private static string MimeTypeOf(string path) => Path.GetExtension(path).ToLowerInvariant() switch
+    {
+        ".png" => "image/png",
+        ".webp" => "image/webp",
+        _ => "image/jpeg",
+    };
 
     // POST /Works/SavePlaylist — 把勾選的歌存成歌單
     [HttpPost]

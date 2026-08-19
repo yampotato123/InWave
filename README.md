@@ -147,6 +147,29 @@ dotnet user-secrets set "YouTube:ApiKey" "你的key"
 注意配額:免費額度一天 10,000 單位,一次搜尋要 100 單位 = 一天只能搜 100 次,
 所以程式內建了 7 天搜尋快取(SearchCaches 表),同關鍵字不會重複打 API。
 
+### AI 判讀照片(選用,沒設也能跑)
+
+照片的氣氛判讀交給 n8n 的工作流(見「三個關鍵決策」第 1 點)。沒設定就略過 AI,
+推薦仍由 `MoodKeywordMapper` 的規則產生,功能不會壞。
+
+| 設定鍵 | 預設值 | 說明 |
+|---|---|---|
+| `N8n:AnalyzeUrl` | `http://localhost:5678/webhook/inwave/analyze` | 容器內要改成 `http://n8n:5678/...`,已由 `docker-compose.yml` 覆寫 |
+| `N8n:Token` | 空 | n8n Webhook 節點的 Header Auth token,送出時放在 `X-InWave-Token` |
+| `N8n:TimeoutSeconds` | 120 | 實測 Gemini 延遲 16–105 秒落差很大,設 30 秒會誤殺 |
+
+```powershell
+# 本機 F5:token 放 user-secrets
+dotnet user-secrets set "N8n:Token" "你的token"
+
+# 容器:放專案根目錄的 .env(已被 .gitignore 擋住)
+# N8N_WEBHOOK_TOKEN=你的token
+```
+
+n8n 那端的工作流定義在 `n8n-workflows/inwave-analyze.json`,
+由 `scripts/build-n8n-workflow.ps1` 產生。匯入與驗證方式見該腳本開頭的註解,
+不經過 C# 的單獨驗證用 `scripts/test-n8n-webhook.ps1`。
+
 ## 專案結構(照這個模式加新功能)
 
 ```

@@ -5,6 +5,48 @@
 
 ---
 
+## 更新（2026-08-19）：階段 3 步驟 2 完成（C# 打得到 n8n）
+
+管線通了，**推薦邏輯刻意維持原樣**——這一步只驗「容器內的 C# 能不能以服務名稱連到隔壁容器」。
+
+| 檔案 | 做了什麼 |
+|---|---|
+| `Services/IPhotoAnalysisService.cs` | 契約與回傳型別。`PhotoAnalysisResult` 含 `RawJson`，步驟 3 要整包存進 `PhotoAnalysis` |
+| `Services/PhotoAnalysisService.cs` | 呼叫 n8n、解析回應。**不丟例外**，任何失敗都回 `Ok=false` |
+| `Program.cs:16-22` | typed client 註冊，timeout 120 秒 |
+| `WorksController.cs` | `Recommend` 呼叫後只寫 log（`LogAnalysisAsync`） |
+| `appsettings.json` / `docker-compose.yml` | `N8n:AnalyzeUrl`、`N8n:Token`（容器走 `http://n8n:5678`） |
+| `InWave.Tests/PhotoAnalysisServiceTests.cs` | 10 項解析測試，用假 handler 不打真的 n8n |
+
+**命名與計畫書不同**：計畫寫 `IRecommendService`，實作用 `IPhotoAnalysisService`——
+它做的是判讀，回傳的東西步驟 3 會存成 `PhotoAnalysis`，服務與實體同名比較不會混淆。
+
+### 驗收證據
+
+```
+docker logs inwave:
+  Start processing HTTP request POST http://n8n:5678/webhook/inwave/analyze
+  Received HTTP response headers after 48505ms - 200
+  AI 判讀成功(photoId=2):scene=夕陽海畔邊的剪影與飛鳥 moodPick=懷舊
+    mood=[懷舊、夢幻、詩意、寂寥]
+    songs=Cigarettes After Sex - Apocalypse / 久石讓 - One Summer's Day / deca joins - 海浪 / …
+```
+
+`mood[]` 出現「寂寥」（八種以外）而 `moodPick` 是「懷舊」——正是分兩個欄位的理由。
+`moodPick` 的合法性在 C# 端驗（`PhotoAnalysisService.Parse`），不在 n8n 再抄一份八種清單。
+
+建置 0 警告 0 錯誤；測試 **30/30**（原 20 + 新 10）。
+
+### 已知代價（步驟 3 之前先忍著）
+
+- **`Recommend` 頁現在會慢 16–105 秒**：每次重新整理都重打一次 AI。
+  步驟 3 的持久化就是為了解決這個，**不要在它之前拿去 demo**。
+- 送的是原圖全尺寸。10 MB 的照片 base64 後約 13.3 MB，n8n 預設上限 16 MB，
+  過得去但很貼。要縮圖的話在 C# 端做（長邊 1600，與 `Edit.cshtml:90` 同一個值）。
+- 容器 DB 多了一筆測試作品（photoId=2），`wwwroot/uploads/` 多一個檔。
+
+---
+
 ## 更新（2026-08-19）：階段 3 步驟 1 完成（n8n 工作流已跑通）
 
 `inwave-analyze` 工作流已建置、啟用並**實測通過**。工作流 id `inwaveAnalyze001`
@@ -339,8 +381,9 @@ Phase 1 已驗證完成，所以視覺這輪可以放手做。
 | 2　n8n 納入同一個 compose | ✅ 完成 |
 | **Spike　驗證 AI 路徑** | ✅ **完成，且推翻了原始設計** |
 | **3-1　n8n 工作流** | ✅ **完成並實測**（2026-08-19，見本檔最上方） |
-| **3-2　C# 打得到 n8n** | ⬜ **未開始 ← 下一步** |
-| 3-3 持久化 / 3-4 YouTube 改歌名搜 / 3-5 fallback | ⬜ 未開始 |
+| **3-2　C# 打得到 n8n** | ✅ **完成並實測**（2026-08-19） |
+| **3-3　持久化 PhotoAnalysis** | ⬜ **未開始 ← 下一步**（形狀已定案，見下方） |
+| 3-4 YouTube 改歌名搜 / 3-5 fallback 與測試 | ⬜ 未開始 |
 | 4　AI 風格濾鏡（選配） | ⬜ 未開始 |
 
 ### 開場先讀這三份（依序）

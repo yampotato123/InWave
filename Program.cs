@@ -12,6 +12,14 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // YouTubeService 需要 HttpClient,用 typed client 註冊
 builder.Services.AddHttpClient<IYouTubeService, YouTubeService>();
 
+// AI 判讀照片(n8n → Gemini)。實測延遲 16–105 秒且落差很大,預設 30 秒會誤殺,
+// 所以拉到 120 秒;超過就當它掛了,由呼叫端走 MoodKeywordMapper fallback。
+builder.Services.AddHttpClient<IPhotoAnalysisService, PhotoAnalysisService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(
+        builder.Configuration.GetValue<int?>("N8n:TimeoutSeconds") ?? 120);
+});
+
 var app = builder.Build();
 
 // 容器首次啟動時資料庫檔案不存在,啟動時自動套用 migration 建好。
