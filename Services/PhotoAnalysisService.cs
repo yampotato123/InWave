@@ -86,6 +86,8 @@ public class PhotoAnalysisService : IPhotoAnalysisService
         return Parse(body);
     }
 
+    public PhotoAnalysisResult ParseRaw(string rawJson) => Parse(rawJson);
+
     private PhotoAnalysisResult Parse(string body)
     {
         // 工作流失敗時 n8n 也是回 200 + {"ok":false,...},所以狀態碼不能當成功判準

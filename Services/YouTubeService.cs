@@ -93,6 +93,104 @@ public class YouTubeService : IYouTubeService
         return results;
     }
 
+    public async Task<SongResult?> FindVideoAsync(string artist, string title)
+    {
+        artist = artist.Trim();
+        title = title.Trim();
+        if (artist.Length == 0 || title.Length == 0)
+            return null;
+
+        // 快取鍵加前綴,與 SearchAsync 的關鍵字搜尋分開,避免兩種語意共用同一筆
+        var cacheKey = $"song:{artist} - {title}";
+        var cacheCutoff = DateTime.UtcNow - CacheDuration;
+        var cached = await _db.SearchCaches
+            .Where(c => c.Query == cacheKey && c.FetchedAt > cacheCutoff)
+            .OrderByDescending(c => c.FetchedAt)
+            .FirstOrDefaultAsync();
+
+        if (cached != null)
+        {
+            // 空陣列代表「上次找過,確定找不到」——照樣算命中,不要再打 API
+            return JsonSerializer.Deserialize<List<SongResult>>(cached.JsonResult)?.FirstOrDefault();
+        }
+
+        var apiKey = _config["YouTube:ApiKey"];
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            _logger.LogWarning("YouTube:ApiKey 未設定,無法為「{Artist} - {Title}」找影片。", artist, title);
+            return null;
+        }
+
+        // 這裡刻意不加 videoCategoryId=10。指名搜尋要的是「那一首」,
+        // 而 OST、動畫歌常被歸在其他分類,加了會找不到。改用下面的挑選規則過濾。
+        var url = "https://www.googleapis.com/youtube/v3/search" +
+                  "?part=snippet&type=video&maxResults=5" +
+                  $"&q={Uri.EscapeDataString($"{artist} {title}")}&key={apiKey}";
+
+        List<SongResult> candidates;
+        try
+        {
+            using var response = await _http.GetAsync(url);
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync();
+                _logger.LogError("YouTube API 回應 {Status}:{Body}", response.StatusCode, errorBody);
+                return null;   // 不快取,配額或網路問題排除後應該要能重試
+            }
+
+            using var json = JsonDocument.Parse(await response.Content.ReadAsStreamAsync());
+            candidates = json.RootElement.GetProperty("items").EnumerateArray()
+                // 直播與首播嵌入播放常有限制,而且不會是那首歌本身
+                .Where(item => item.GetProperty("snippet").GetProperty("liveBroadcastContent")
+                    .GetString() == "none")
+                .Select(item => new SongResult(
+                    VideoId: item.GetProperty("id").GetProperty("videoId").GetString() ?? "",
+                    Title: item.GetProperty("snippet").GetProperty("title").GetString() ?? "",
+                    Artist: item.GetProperty("snippet").GetProperty("channelTitle").GetString() ?? "",
+                    ThumbnailUrl: item.GetProperty("snippet").GetProperty("thumbnails")
+                        .GetProperty("medium").GetProperty("url").GetString() ?? ""))
+                .Where(r => r.VideoId != "")
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "呼叫 YouTube API 失敗({Artist} - {Title})", artist, title);
+            return null;
+        }
+
+        var picked = Pick(candidates, artist);
+
+        // 找不到也要快取(存空陣列),否則冷門歌每次重新整理都燒 100 單位
+        _db.SearchCaches.Add(new SearchCache
+        {
+            Query = cacheKey,
+            JsonResult = JsonSerializer.Serialize(
+                picked == null ? new List<SongResult>() : new List<SongResult> { picked }),
+            FetchedAt = DateTime.UtcNow,
+        });
+        await _db.SaveChangesAsync();
+
+        if (picked == null)
+            _logger.LogInformation("YouTube 找不到「{Artist} - {Title}」", artist, title);
+
+        return picked;
+    }
+
+    /// <summary>
+    /// 從候選中挑最可能是「原曲本身」的那支。
+    /// 「- Topic」是 YouTube 自動為唱片公司音源建立的頻道,幾乎一定是原曲;
+    /// 其次是頻道名帶歌手名的(官方頻道);再其次才是第一筆(通常是翻唱或二創)。
+    /// </summary>
+    private static SongResult? Pick(List<SongResult> candidates, string artist)
+    {
+        if (candidates.Count == 0)
+            return null;
+
+        return candidates.FirstOrDefault(c => c.Artist.EndsWith("- Topic", StringComparison.OrdinalIgnoreCase))
+            ?? candidates.FirstOrDefault(c => c.Artist.Contains(artist, StringComparison.OrdinalIgnoreCase))
+            ?? candidates[0];
+    }
+
     /// <summary>沒有 API key 時的示範資料(都是真實可播放的影片)。</summary>
     private static List<SongResult> MockResults() => new()
     {

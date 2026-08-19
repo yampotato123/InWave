@@ -5,6 +5,61 @@
 
 ---
 
+## 更新（2026-08-19）：階段 3 步驟 4 完成（推薦真的來自照片了）
+
+**產品命題終於成立**：換一張照片，推薦就不一樣。先前無論照片是什麼，
+輸出空間都固定在 32 種關鍵字（8 情緒 × 4 濾鏡）。
+
+| 檔案 | 做了什麼 |
+|---|---|
+| `Services/YouTubeService.cs` | 新增 `FindVideoAsync(artist, title)`：給指定的歌找一支影片 |
+| `Services/IPhotoAnalysisService.cs` | 新增 `ParseRaw`，讓「首次判讀」與「從資料庫讀回」共用同一段解析 |
+| `WorksController.cs` | `Recommend` 改走 AI 推的歌；解不出來才回落關鍵字搜尋 |
+| `InWave.Tests/YouTubeServiceFindVideoTests.cs` | 11 項測試（挑選規則、快取、配額保護）|
+
+### `FindVideoAsync` 與既有 `SearchAsync` 的差別
+
+| | `SearchAsync` | `FindVideoAsync` |
+|---|---|---|
+| 語意 | 給關鍵字要一串候選 | 給指定的歌要**那一支** |
+| 分類過濾 | `videoCategoryId=10` | **不加**——OST 與動畫歌常在其他分類，加了會找不到 |
+| 挑選 | 全部回傳 | 「- Topic」頻道 > 頻道名含歌手名 > 第一筆 |
+| 直播 | 不過濾 | 過濾 `liveBroadcastContent != "none"` |
+| 快取失敗 | 不快取 | **連「找不到」也快取**——否則冷門歌每次重新整理燒 100 單位 |
+
+**沒有照計畫用 `Songs` 表當快取。** `Songs.Artist` 存的是 YouTube 頻道名稱
+（`Song.cs:11`），不是 AI 給的歌手名，拿它比對會對不上；而且 `Songs` 只有
+「使用者存進歌單的歌」，本來就不是快取。改用既有的 `SearchCaches`，
+鍵加 `song:` 前綴與關鍵字搜尋分開，**零 migration**。
+
+### 驗收證據（本機實跑，真實 YouTube API）
+
+AI 判讀 → 五首全部找到真實影片：
+
+```
+Beach House - Space Song              → Sub Pop（廠牌官方）
+Sunset Rollercoaster - My Jinji       → Sunset Rollercoaster落日飛車
+Ludovico Einaudi - Experience         → Ludovico Einaudi
+RADWIMPS - スパークル                 → Radwimps - Topic   ← Topic 規則命中
+張懸 - 關於我愛你                      → DesertsXuanVEVO
+```
+
+快取：重開推薦頁 **0 次** API 呼叫、**186 ms**（首次 42 秒）。
+一次推薦 5 首 = 500 單位，一天 10,000 單位的額度**只夠 20 次全新推薦**——
+所以那層快取不是優化，是能不能用的問題。
+
+建置 0 警告 0 錯誤；測試 **42/42**。
+
+### 還沒做的
+
+- **容器測不到這段**：`.env` 的 `YOUTUBE_API_KEY` 是空的，容器內會回落示範資料。
+  要在容器驗證得把金鑰填進 `.env` 再 `docker compose up -d`。
+- **`moodPick` 沒有回填** `MoodProfile.MoodName`。所以使用者沒選情緒時，
+  收藏櫃的書背仍是預設灰（`Index.cshtml:78-83` 的 switch 認不得空字串）。
+  這是刻意留的：回填會改動既有資料，值得單獨一步。
+
+---
+
 ## 更新（2026-08-19）：階段 3 步驟 3 完成（判讀結果已持久化）
 
 同一張照片只打一次 AI。`Recommend` 是 GET，先前每次重新整理都是一次付費呼叫＋16–105 秒的等待。
@@ -428,8 +483,8 @@ Phase 1 已驗證完成，所以視覺這輪可以放手做。
 | **3-1　n8n 工作流** | ✅ **完成並實測**（2026-08-19，見本檔最上方） |
 | **3-2　C# 打得到 n8n** | ✅ **完成並實測**（2026-08-19） |
 | **3-3　持久化 PhotoAnalysis** | ✅ **完成並實測**（2026-08-19） |
-| **3-4　YouTube 改以歌名搜尋** | ⬜ **未開始 ← 下一步** |
-| 3-5 fallback 與測試 | ⬜ 未開始 |
+| **3-4　YouTube 改以歌名搜尋** | ✅ **完成並實測**（2026-08-19） |
+| **3-5　fallback 與測試** | ⬜ **未開始 ← 下一步**（回落邏輯已寫，缺實際斷網驗證）|
 | 4　AI 風格濾鏡（選配） | ⬜ 未開始 |
 
 ### 開場先讀這三份（依序）
@@ -637,10 +692,10 @@ git filter-repo --email-callback '
   舊表述是「AI 讀原圖，不讀修圖後的圖」，意圖正確（避免暖陽濾鏡被算兩次）
   但仍保留事後拼接。完整理由與被否決的替代方案見
   `docs/superpowers/specs/2026-08-11-docker-n8n-ai-design.md` §3.2。
-- **推薦目前完全沒有用到照片內容**：`GetKeyword` 的輸入只有手選的情緒與濾鏡，
-  輸出空間固定為 32 種字串（8 情緒 × 4 濾鏡狀態）。換掉照片、其餘不變，
-  推薦結果完全相同。`PROGRESS.md` 先前指出「產品命題在畫面上完全不見」，
-  **同一句話對推薦邏輯也成立**。這正是階段 3 要補的缺口。
+- ~~**推薦目前完全沒有用到照片內容**~~ → **2026-08-19 已解決**（階段 3 步驟 4）。
+  推薦現在來自 AI 對照片的判讀；`MoodKeywordMapper` 的 32 種關鍵字降級為
+  AI 不可用時的回落路徑。歷史記錄保留於此：先前換掉照片、其餘不變，
+  推薦結果會完全相同——那才是原本最該補的缺口。
 
 ---
 

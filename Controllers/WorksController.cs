@@ -210,19 +210,41 @@ public class WorksController : Controller
         if (photo?.Mood == null)
             return NotFound();
 
-        // 階段 3 步驟 3:判讀結果已持久化,同一張照片只打一次 AI。
-        // 推薦邏輯仍維持原樣,步驟 4 才改成用 AI 推的歌去搜 YouTube。
-        await EnsureAnalysisAsync(photo);
+        // 判讀結果已持久化,同一張照片只打一次 AI(階段 3 步驟 3)
+        var analysis = await EnsureAnalysisAsync(photo);
 
+        // 主線:AI 看照片推的歌。AI 沒判成、或推的歌一首都在 YouTube 上找不到時,
+        // 回落到規則關鍵字搜尋——功能不會因為 AI 掛掉而消失。
+        var results = new List<SongResult>();
         var keyword = MoodKeywordMapper.GetKeyword(photo.Mood.MoodName, photo.Edit?.FilterName);
-        var results = await _youtube.SearchAsync(keyword);
+        var searchDescription = keyword;
+
+        if (analysis is { Ok: true } && analysis.Songs.Count > 0)
+        {
+            results = await ResolveAsync(analysis.Songs);
+            if (results.Count > 0)
+            {
+                searchDescription = string.IsNullOrWhiteSpace(analysis.Scene)
+                    ? "AI 判讀照片後推薦"
+                    : $"AI 判讀:{analysis.Scene}";
+            }
+            else
+            {
+                _logger.LogWarning(
+                    "AI 推的 {Count} 首歌在 YouTube 上一首都沒找到(photoId={PhotoId}),回落關鍵字搜尋",
+                    analysis.Songs.Count, photo.Id);
+            }
+        }
+
+        if (results.Count == 0)
+            results = await _youtube.SearchAsync(keyword);
 
         var vm = new RecommendViewModel
         {
             PhotoId = photo.Id,
             PhotoPath = photo.EditedPath ?? photo.OriginalPath,
             MoodName = photo.Mood.MoodName,
-            SearchKeyword = keyword,
+            SearchKeyword = searchDescription,
             // 情緒未指定時不要留下開頭孤伶伶的「・」
             PlaylistName = string.IsNullOrEmpty(photo.Mood.MoodName)
                 ? $"作品・{DateTime.Now:MM/dd}"
@@ -250,21 +272,21 @@ public class WorksController : Controller
     ///
     /// 判讀失敗時**不寫入**,讓下次重新整理可以重試;失敗只記 log,不影響畫面。
     /// </summary>
-    private async Task EnsureAnalysisAsync(Photo photo)
+    private async Task<PhotoAnalysisResult?> EnsureAnalysisAsync(Photo photo)
     {
         if (photo.Analysis != null)
         {
             _logger.LogInformation(
                 "已有 AI 判讀(photoId={PhotoId},{AnalyzedAt:yyyy-MM-dd HH:mm}),不重複呼叫",
                 photo.Id, photo.Analysis.AnalyzedAt);
-            return;
+            return _analysis.ParseRaw(photo.Analysis.RawJson);
         }
 
         var fullPath = Path.Combine(_env.WebRootPath, photo.OriginalPath.TrimStart('/'));
         if (!System.IO.File.Exists(fullPath))
         {
             _logger.LogWarning("AI 判讀略過:找不到原圖 {Path}", fullPath);
-            return;
+            return null;
         }
 
         var result = await _analysis.AnalyzeAsync(
@@ -281,7 +303,7 @@ public class WorksController : Controller
         {
             // 不寫入,下次重新整理會重試。AI 掛掉不該在資料庫留下一筆空判讀擋住後續。
             _logger.LogWarning("AI 判讀失敗(photoId={PhotoId}):{Error}", photo.Id, result.Error);
-            return;
+            return result;
         }
 
         _db.PhotoAnalyses.Add(new PhotoAnalysis
@@ -302,6 +324,26 @@ public class WorksController : Controller
             result.MoodPick ?? "(不在八種內)",
             string.Join('、', result.Mood),
             string.Join(" / ", result.Songs.Select(s => $"{s.Artist} - {s.Title}")));
+
+        return result;
+    }
+
+    /// <summary>
+    /// 把 AI 推的「歌手 + 歌名」逐首換成可播放的 YouTube 影片。找不到的直接跳過。
+    ///
+    /// 刻意循序而非並行:AppDbContext 不是執行緒安全的,而 FindVideoAsync 會讀寫快取表。
+    /// 五首歌命中快取時只是五次本機查詢,不值得為此引入 scope 管理。
+    /// </summary>
+    private async Task<List<SongResult>> ResolveAsync(IReadOnlyList<AnalyzedSong> songs)
+    {
+        var resolved = new List<SongResult>();
+        foreach (var song in songs)
+        {
+            var found = await _youtube.FindVideoAsync(song.Artist, song.Title);
+            if (found != null)
+                resolved.Add(found);
+        }
+        return resolved;
     }
 
     private static string MimeTypeOf(string path) => Path.GetExtension(path).ToLowerInvariant() switch

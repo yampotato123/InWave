@@ -39,6 +39,13 @@ public interface IPhotoAnalysisService
     /// </summary>
     /// <param name="mood">使用者選的情緒;沒選就傳 null,整個欄位不會送出(AI 純憑照片判讀)。</param>
     /// <param name="filter">使用者選的濾鏡名稱;沒選傳 null。</param>
+    /// <summary>
+    /// 解析已經存在資料庫的 PhotoAnalysis.RawJson。
+    /// 與 AnalyzeAsync 共用同一段解析邏輯(含 moodPick 的八選一驗證),
+    /// 免得「第一次判讀」與「之後從資料庫讀出來」兩條路得到不同結果。
+    /// </summary>
+    PhotoAnalysisResult ParseRaw(string rawJson);
+
     Task<PhotoAnalysisResult> AnalyzeAsync(
         byte[] imageBytes,
         string mimeType,
