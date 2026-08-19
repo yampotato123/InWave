@@ -124,6 +124,7 @@ public class PhotoAnalysisService : IPhotoAnalysisService
             Mood: GetStringArray(root, "mood"),
             Keywords: GetStringArray(root, "keywords"),
             Songs: GetSongs(root),
+            Model: GetString(root, "model"),
             RawJson: body);
     }
 

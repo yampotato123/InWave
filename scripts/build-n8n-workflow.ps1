@@ -93,12 +93,21 @@ const cleaned = raw
   .trim();
 
 try {
-  return [{ json: { ok: true, ...JSON.parse(cleaned) } }];
+  // model 放在展開之後,AI 覆寫不了。C# 存進 PhotoAnalysis.ModelUsed,日後比較模型版本用。
+  // n8n 的 Gemini 節點輸出只有 content / finishReason / index,拿不到 modelVersion,
+  // 所以由工作流自己標註——值來自產生本檔的 $modelId,與節點設定同一個來源。
+  return [{ json: { ok: true, ...JSON.parse(cleaned), model: '__MODEL_ID__' } }];
 } catch (e) {
   // 不吞掉——把原文回傳,C# 端才知道是 AI 格式壞掉而非網路問題,並據此走 fallback
   return [{ json: { ok: false, error: 'PARSE_FAILED', raw } }];
 }
 '@
+
+# 模型選擇理由見 notes/2026-08-11-spike-AI推薦流程.md §六-3
+# (live / image / tts / embedding 那幾類都不能選)。
+# 這個變數同時餵給 Gemini 節點與 Parse 節點回傳的 model 欄位,只有一個來源。
+$modelId = 'models/gemini-3.6-flash'
+$parseCode = $parseCode.Replace('__MODEL_ID__', $modelId)
 
 $wf = [ordered]@{
   id     = 'inwaveAnalyze001'
@@ -147,9 +156,9 @@ $wf = [ordered]@{
         operation = 'analyze'
         modelId   = [ordered]@{
           '__rl'           = $true
-          value            = 'models/gemini-3.6-flash'
+          value            = $modelId
           mode             = 'list'
-          cachedResultName = 'models/gemini-3.6-flash'
+          cachedResultName = $modelId
         }
         text      = "={{ `$('Build Prompt').item.json.prompt }}"
         inputType = 'binary'

@@ -14,5 +14,8 @@ public class Photo
 
     public PhotoEdit? Edit { get; set; }
     public MoodProfile? Mood { get; set; }
+
+    /// <summary>AI 判讀結果;還沒判讀過為 null</summary>
+    public PhotoAnalysis? Analysis { get; set; }
     public List<Playlist> Playlists { get; set; } = new();
 }

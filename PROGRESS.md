@@ -5,6 +5,51 @@
 
 ---
 
+## 更新（2026-08-19）：階段 3 步驟 3 完成（判讀結果已持久化）
+
+同一張照片只打一次 AI。`Recommend` 是 GET，先前每次重新整理都是一次付費呼叫＋16–105 秒的等待。
+
+| 檔案 | 做了什麼 |
+|---|---|
+| `Models/PhotoAnalysis.cs` | 新實體，與 `Photo` 一對一（混合形狀：`RawJson` + `Scene`/`AnalyzedAt`/`ModelUsed`）|
+| `Migrations/20260819114340_AddPhotoAnalysis.cs` | 一次 migration，`PhotoId` 唯一索引 + cascade delete |
+| `WorksController.cs` | `EnsureAnalysisAsync`：查到就用，沒有才呼叫 AI 並寫入 |
+| `scripts/build-n8n-workflow.ps1` | 工作流回應新增 `model` 欄位 |
+
+### 驗收證據
+
+```
+執行前            executions=11
+第一次 Recommend  executions=12   HTTP 200，28 秒
+重新整理 ×3       executions=12   HTTP 200，3137 / 2235 / 2118 ms
+```
+
+log：`已有 AI 判讀(photoId=3,2026-08-19 11:47),不重複呼叫` ×3。
+資料表 read-back（實際查 `PhotoAnalyses`，不是看 log）：
+
+```
+Id=1 PhotoId=3 Scene=夕陽海灘上飛鳥與人物剪影
+AnalyzedAt=2026-08-19 11:47:48  ModelUsed=models/gemini-3.6-flash  RawJson 586 字元
+```
+
+建置 0 警告 0 錯誤；測試 **31/31**。
+
+### 兩個設計決定
+
+- **失敗不寫入**：AI 掛掉時不留一筆空判讀，下次重新整理會重試。若寫了空值，
+  這張照片就永遠不會再判讀了。
+- **`ModelUsed` 由工作流標註**：n8n 的 Gemini 節點輸出只有 `content`/`finishReason`/`index`，
+  拿不到 `modelVersion`。所以由 Parse 節點附上，值來自產生工作流的 `$modelId` 變數，
+  與 Gemini 節點設定同一個來源，不會走鐘。
+
+### 還沒做的
+
+- **重新判讀沒有入口**：換了照片或改了 prompt 之後，舊判讀會一直沿用。
+  `AnalyzedAt` 與 `ModelUsed` 就是為此留的，但目前沒有任何地方會觸發重跑。
+- 判讀結果目前只進資料庫與 log，**畫面上還看不到**（步驟 4 才會用它搜 YouTube）。
+
+---
+
 ## 更新（2026-08-19）：階段 3 步驟 2 完成（C# 打得到 n8n）
 
 管線通了，**推薦邏輯刻意維持原樣**——這一步只驗「容器內的 C# 能不能以服務名稱連到隔壁容器」。
@@ -382,8 +427,9 @@ Phase 1 已驗證完成，所以視覺這輪可以放手做。
 | **Spike　驗證 AI 路徑** | ✅ **完成，且推翻了原始設計** |
 | **3-1　n8n 工作流** | ✅ **完成並實測**（2026-08-19，見本檔最上方） |
 | **3-2　C# 打得到 n8n** | ✅ **完成並實測**（2026-08-19） |
-| **3-3　持久化 PhotoAnalysis** | ⬜ **未開始 ← 下一步**（形狀已定案，見下方） |
-| 3-4 YouTube 改歌名搜 / 3-5 fallback 與測試 | ⬜ 未開始 |
+| **3-3　持久化 PhotoAnalysis** | ✅ **完成並實測**（2026-08-19） |
+| **3-4　YouTube 改以歌名搜尋** | ⬜ **未開始 ← 下一步** |
+| 3-5 fallback 與測試 | ⬜ 未開始 |
 | 4　AI 風格濾鏡（選配） | ⬜ 未開始 |
 
 ### 開場先讀這三份（依序）

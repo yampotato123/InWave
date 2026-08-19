@@ -11,6 +11,7 @@ public class AppDbContext : DbContext
 
     public DbSet<Photo> Photos => Set<Photo>();
     public DbSet<PhotoEdit> PhotoEdits => Set<PhotoEdit>();
+    public DbSet<PhotoAnalysis> PhotoAnalyses => Set<PhotoAnalysis>();
     public DbSet<MoodProfile> MoodProfiles => Set<MoodProfile>();
     public DbSet<Song> Songs => Set<Song>();
     public DbSet<Playlist> Playlists => Set<Playlist>();
@@ -40,5 +41,12 @@ public class AppDbContext : DbContext
             .HasOne(p => p.Mood)
             .WithOne(m => m.Photo)
             .HasForeignKey<MoodProfile>(m => m.PhotoId);
+
+        // 一張照片只判讀一次;照片刪掉時判讀結果跟著走
+        modelBuilder.Entity<Photo>()
+            .HasOne(p => p.Analysis)
+            .WithOne(a => a.Photo)
+            .HasForeignKey<PhotoAnalysis>(a => a.PhotoId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

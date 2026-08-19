@@ -11,7 +11,8 @@ public record AnalyzedSong(string Artist, string Title, string Why);
 /// <param name="Error">失敗原因代碼:AI_UNAVAILABLE、PARSE_FAILED(n8n 端)或 TIMEOUT、NETWORK、HTTP_xxx、BAD_JSON(C# 端)。</param>
 /// <param name="MoodPick">封閉八選一,可直接寫回 MoodProfile.MoodName;AI 若給了範圍外的值,這裡會是 null。</param>
 /// <param name="Mood">自由詞彙,僅供顯示,不可拿來當 MoodName。</param>
-/// <param name="RawJson">原始回應全文。階段 3 要整包存進 PhotoAnalysis.RawJson,所以這裡先留著。</param>
+/// <param name="Model">判讀用的模型,由工作流標註(n8n 的 Gemini 節點輸出拿不到 modelVersion)。</param>
+/// <param name="RawJson">原始回應全文,整包存進 PhotoAnalysis.RawJson。</param>
 public record PhotoAnalysisResult(
     bool Ok,
     string? Error,
@@ -20,11 +21,12 @@ public record PhotoAnalysisResult(
     IReadOnlyList<string> Mood,
     IReadOnlyList<string> Keywords,
     IReadOnlyList<AnalyzedSong> Songs,
+    string? Model,
     string RawJson)
 {
     public static PhotoAnalysisResult Failure(string error, string raw = "") =>
         new(false, error, null, null, Array.Empty<string>(), Array.Empty<string>(),
-            Array.Empty<AnalyzedSong>(), raw);
+            Array.Empty<AnalyzedSong>(), null, raw);
 }
 
 public interface IPhotoAnalysisService

@@ -16,7 +16,8 @@ public class PhotoAnalysisServiceTests
 {
     private const string ValidBody = """
         {"ok":true,"scene":"夕陽海畔","moodPick":"懷舊","mood":["懷舊","詩意"],
-         "keywords":["sunset"],"songs":[{"artist":"Max Richter","title":"On the Nature of Daylight","why":"溫柔"}]}
+         "keywords":["sunset"],"songs":[{"artist":"Max Richter","title":"On the Nature of Daylight","why":"溫柔"}],
+         "model":"models/gemini-3.6-flash"}
         """;
 
     private static PhotoAnalysisService MakeService(HttpStatusCode status, string body)
@@ -53,6 +54,18 @@ public class PhotoAnalysisServiceTests
         Assert.Single(result.Songs);
         Assert.Equal("Max Richter", result.Songs[0].Artist);
         Assert.Equal("On the Nature of Daylight", result.Songs[0].Title);
+        // 由工作流標註,存進 PhotoAnalysis.ModelUsed 供日後比較模型版本
+        Assert.Equal("models/gemini-3.6-flash", result.Model);
+    }
+
+    [Fact]
+    public async Task 工作流沒標註model時_不阻斷判讀()
+    {
+        var result = await AnalyzeAsync(HttpStatusCode.OK,
+            """{"ok":true,"scene":"海邊","moodPick":"安靜","songs":[]}""");
+
+        Assert.True(result.Ok);
+        Assert.Null(result.Model);
     }
 
     [Fact]

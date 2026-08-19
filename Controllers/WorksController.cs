@@ -204,15 +204,15 @@ public class WorksController : Controller
     {
         var photo = await _db.Photos
             .Include(p => p.Mood)
-            .Include(p => p.Edit)   // 濾鏡要參與關鍵字;少了這行 photo.Edit 是 null,濾鏡會安靜失效
+            .Include(p => p.Edit)       // 濾鏡要參與關鍵字;少了這行 photo.Edit 是 null,濾鏡會安靜失效
+            .Include(p => p.Analysis)   // 少了這行每次重新整理都會重打一次 AI
             .FirstOrDefaultAsync(p => p.Id == photoId);
         if (photo?.Mood == null)
             return NotFound();
 
-        // 階段 3 步驟 2:只驗管線——呼叫 AI 並寫進 log,推薦邏輯維持原樣。
-        // 步驟 3 會把結果存進 PhotoAnalysis(現在每次重新整理都會重打一次 AI),
-        // 步驟 4 才改成用 AI 推的歌去搜 YouTube。
-        await LogAnalysisAsync(photo);
+        // 階段 3 步驟 3:判讀結果已持久化,同一張照片只打一次 AI。
+        // 推薦邏輯仍維持原樣,步驟 4 才改成用 AI 推的歌去搜 YouTube。
+        await EnsureAnalysisAsync(photo);
 
         var keyword = MoodKeywordMapper.GetKeyword(photo.Mood.MoodName, photo.Edit?.FilterName);
         var results = await _youtube.SearchAsync(keyword);
@@ -240,12 +240,26 @@ public class WorksController : Controller
     }
 
     /// <summary>
-    /// 階段 3 步驟 2 的暫時性驗證:把照片送給 n8n 判讀,結果只寫 log 不影響畫面。
+    /// 確保這張照片有 AI 判讀結果:沒判讀過才呼叫 AI,判過就直接用資料庫那筆。
+    ///
+    /// 為什麼一定要持久化:Recommend 是 GET,使用者按重新整理就會再跑一次。
+    /// 沒有這層擋著的話,每次重新整理都是一次付費呼叫,而且要等 16–105 秒。
+    ///
     /// 送的是原圖(OriginalPath),不是 EditedPath——濾鏡以文字進入 prompt,
     /// 送合成圖會讓濾鏡被算兩次(設計文件 §3.2)。
+    ///
+    /// 判讀失敗時**不寫入**,讓下次重新整理可以重試;失敗只記 log,不影響畫面。
     /// </summary>
-    private async Task LogAnalysisAsync(Photo photo)
+    private async Task EnsureAnalysisAsync(Photo photo)
     {
+        if (photo.Analysis != null)
+        {
+            _logger.LogInformation(
+                "已有 AI 判讀(photoId={PhotoId},{AnalyzedAt:yyyy-MM-dd HH:mm}),不重複呼叫",
+                photo.Id, photo.Analysis.AnalyzedAt);
+            return;
+        }
+
         var fullPath = Path.Combine(_env.WebRootPath, photo.OriginalPath.TrimStart('/'));
         if (!System.IO.File.Exists(fullPath))
         {
@@ -265,13 +279,25 @@ public class WorksController : Controller
 
         if (!result.Ok)
         {
+            // 不寫入,下次重新整理會重試。AI 掛掉不該在資料庫留下一筆空判讀擋住後續。
             _logger.LogWarning("AI 判讀失敗(photoId={PhotoId}):{Error}", photo.Id, result.Error);
             return;
         }
 
+        _db.PhotoAnalyses.Add(new PhotoAnalysis
+        {
+            PhotoId = photo.Id,
+            RawJson = result.RawJson,
+            Scene = result.Scene,
+            AnalyzedAt = DateTime.UtcNow,
+            ModelUsed = result.Model,
+        });
+        await _db.SaveChangesAsync();
+
         _logger.LogInformation(
-            "AI 判讀成功(photoId={PhotoId}):scene={Scene} moodPick={MoodPick} mood=[{Mood}] songs={Songs}",
+            "AI 判讀成功並已存檔(photoId={PhotoId},model={Model}):scene={Scene} moodPick={MoodPick} mood=[{Mood}] songs={Songs}",
             photo.Id,
+            result.Model ?? "(未標註)",
             result.Scene,
             result.MoodPick ?? "(不在八種內)",
             string.Join('、', result.Mood),
