@@ -40,7 +40,8 @@ public class PhotoAnalysisServiceTests
     private static Task<PhotoAnalysisResult> AnalyzeAsync(HttpStatusCode status, string body) =>
         MakeService(status, body).AnalyzeAsync(
             imageBytes: new byte[] { 1, 2, 3 }, mimeType: "image/jpeg",
-            mood: null, filter: null, brightness: 100, contrast: 100, saturation: 100);
+            mood: null, filter: null, playlistName: null,
+            brightness: 100, contrast: 100, saturation: 100);
 
     [Fact]
     public async Task 正常回應_解析出場景與歌曲()
@@ -138,7 +139,7 @@ public class PhotoAnalysisServiceTests
             .Build();
         var service = new PhotoAnalysisService(http, config, NullLogger<PhotoAnalysisService>.Instance);
 
-        var result = await service.AnalyzeAsync(new byte[] { 1 }, "image/jpeg", null, null, 100, 100, 100);
+        var result = await service.AnalyzeAsync(new byte[] { 1 }, "image/jpeg", null, null, null, 100, 100, 100);
 
         Assert.False(result.Ok);
         Assert.Equal("TIMEOUT", result.Error);
@@ -157,7 +158,7 @@ public class PhotoAnalysisServiceTests
             .Build();
         var service = new PhotoAnalysisService(http, config, NullLogger<PhotoAnalysisService>.Instance);
 
-        var result = await service.AnalyzeAsync(new byte[] { 1 }, "image/jpeg", null, null, 100, 100, 100);
+        var result = await service.AnalyzeAsync(new byte[] { 1 }, "image/jpeg", null, null, null, 100, 100, 100);
 
         Assert.False(result.Ok);
         Assert.Equal("NETWORK", result.Error);
@@ -269,7 +270,7 @@ public class PhotoAnalysisServiceTests
             NullLogger<PhotoAnalysisService>.Instance);
 
         var result = await service.AnalyzeAsync(
-            new byte[] { 1 }, "image/jpeg", null, null, 100, 100, 100);
+            new byte[] { 1 }, "image/jpeg", null, null, null, 100, 100, 100);
 
         Assert.False(result.Ok);
         Assert.Equal("NOT_CONFIGURED", result.Error);
@@ -289,7 +290,8 @@ public class PhotoAnalysisServiceTests
             NullLogger<PhotoAnalysisService>.Instance);
 
         await service.AnalyzeAsync(new byte[] { 1 }, "image/jpeg",
-            mood: null, filter: null, brightness: 100, contrast: 100, saturation: 100);
+            mood: null, filter: null, playlistName: null,
+            brightness: 100, contrast: 100, saturation: 100);
 
         Assert.DoesNotContain("\"mood\"", handler.LastRequestBody);
         Assert.DoesNotContain("\"filter\"", handler.LastRequestBody);
@@ -309,7 +311,7 @@ public class PhotoAnalysisServiceTests
             NullLogger<PhotoAnalysisService>.Instance);
 
         await service.AnalyzeAsync(new byte[] { 1 }, "image/jpeg",
-            mood: "夜色", filter: "冷夜", brightness: 130, contrast: 100, saturation: 100);
+            mood: "夜色", filter: "冷夜", playlistName: "深夜的城市", brightness: 130, contrast: 100, saturation: 100);
 
         Assert.Contains("\"mood\":\"\\u591C\\u8272\"", handler.LastRequestBody);   // JSON 會把中文轉義
         Assert.Contains("\"filter\":", handler.LastRequestBody);

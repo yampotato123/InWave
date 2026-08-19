@@ -36,7 +36,7 @@
             自己選了就以你的選擇為準;交給 AI 則由照片內容決定
         </div>
 
-        <button type="submit" class="iw-btn" style="margin-top:38px">下一步:修圖 →</button>
+        <button type="submit" class="iw-btn" id="submitBtn" style="margin-top:38px">下一步:修圖 →</button>
     </form>
 </main>
 
@@ -48,5 +48,63 @@
                 document.querySelectorAll("label.iw-pill").forEach(l => l.classList.remove('is-on'));
                 if (r.checked) document.querySelector(`label[for="${r.id}"]`).classList.add('is-on');
             }));
+
+        // ── 上傳前先在瀏覽器縮圖 ────────────────────────────────────
+        // 手機拍的照片動輒 8–12 MB,以前是原尺寸上傳,然後修圖頁又要把那張原圖
+        // 整個下載下來才畫得出 canvas——「上傳很久才進到濾鏡」就是這樣來的。
+        //
+        // 長邊 1600 與 Edit.cshtml 匯出用的 MAX_EDGE 相同,所以成品畫質不受影響;
+        // 送給 AI 的 payload 也從十幾 MB 降到幾百 KB。
+        // 本來就小於 1600 的圖直接放行,不做無謂的重新編碼。
+        const MAX_EDGE = 1600;
+        const form = document.querySelector('form[enctype]');
+        const fileInput = document.getElementById('photoFile');
+        const submitBtn = document.getElementById('submitBtn');
+
+        function loadImage(file) {
+            return new Promise((resolve, reject) => {
+                const url = URL.createObjectURL(file);
+                const im = new Image();
+                im.onload = () => { URL.revokeObjectURL(url); resolve(im); };
+                im.onerror = () => { URL.revokeObjectURL(url); reject(new Error('decode failed')); };
+                im.src = url;
+            });
+        }
+
+        form.addEventListener('submit', async e => {
+            const file = fileInput.files?.[0];
+            // 已處理過、沒選檔、或不是圖片 → 放行,讓伺服器端的驗證去處理
+            if (!file || form.dataset.resized === '1' || !file.type.startsWith('image/')) return;
+
+            e.preventDefault();
+            const original = submitBtn.textContent;
+            submitBtn.disabled = true;
+            submitBtn.textContent = '處理照片中…';
+
+            try {
+                const im = await loadImage(file);
+                const scale = Math.min(1, MAX_EDGE / Math.max(im.naturalWidth, im.naturalHeight));
+
+                if (scale < 1) {
+                    const c = document.createElement('canvas');
+                    c.width = Math.round(im.naturalWidth * scale);
+                    c.height = Math.round(im.naturalHeight * scale);
+                    c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+                    const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.9));
+                    if (blob) {
+                        const name = (file.name.replace(/\.[^.]+$/, '') || 'photo') + '.jpg';
+                        const dt = new DataTransfer();
+                        dt.items.add(new File([blob], name, { type: 'image/jpeg' }));
+                        fileInput.files = dt.files;
+                    }
+                }
+            } catch {
+                // 縮圖失敗就照原檔送。慢一點總比傳不上去好,10 MB 的上限仍由伺服器把關。
+            }
+
+            form.dataset.resized = '1';
+            submitBtn.textContent = original;
+            form.submit();
+        });
     </script>
 }

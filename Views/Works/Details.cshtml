@@ -54,10 +54,20 @@
             <div id="barArtist" style="font-size:11px;color:rgba(255,255,255,.45);font-weight:300">@first?.Artist</div>
         </div>
     </div>
-    <div style="display:flex;align-items:center;gap:18px">
-        <span id="prev" style="cursor:pointer;color:rgba(255,255,255,.5)">◀◀</span>
-        <span id="toggle" style="display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;background:#fff;color:#000;font-size:12px;cursor:pointer">❚❚</span>
-        <span id="next" style="cursor:pointer;color:rgba(255,255,255,.5)">▶▶</span>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:8px;min-width:0;width:100%">
+        <div style="display:flex;align-items:center;gap:18px">
+            <span id="prev" style="cursor:pointer;color:rgba(255,255,255,.5)">◀◀</span>
+            <span id="toggle" style="display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;background:#fff;color:#000;font-size:12px;cursor:pointer">❚❚</span>
+            <span id="next" style="cursor:pointer;color:rgba(255,255,255,.5)">▶▶</span>
+        </div>
+        @* 進度條。播放器本身是 1px 隱藏的,所以 YouTube 原生的進度列看不到,
+           這裡自己畫一條,並且可以點擊或拖曳跳轉。 *@
+        <div style="display:flex;align-items:center;gap:10px;width:min(520px,46vw)">
+            <span id="tNow" class="iw-mono" style="font-size:10px;letter-spacing:.06em;width:34px;text-align:right">0:00</span>
+            <input id="seek" type="range" class="iw-seek" min="0" max="1000" value="0" step="1"
+                   aria-label="播放進度" style="flex:1" />
+            <span id="tEnd" class="iw-mono" style="font-size:10px;letter-spacing:.06em;width:34px">0:00</span>
+        </div>
     </div>
     <div style="justify-self:end"><div id="player" style="width:1px;height:1px;overflow:hidden"></div></div>
 </footer>
@@ -99,5 +109,39 @@
             if (s === YT.PlayerState.PLAYING) { yt.pauseVideo(); toggle.textContent = '▶'; }
             else { yt?.playVideo(); toggle.textContent = '❚❚'; }
         };
+
+        // ── 進度條 ──────────────────────────────────────────────
+        // YouTube 的 API 沒有進度事件,只能自己輪詢。用 0–1000 的相對刻度而不是秒數,
+        // 這樣換一首歌不必重設 max,拖曳中的值也不會被新歌的長度截掉。
+        const fmt = s => {
+            if (!isFinite(s) || s < 0) return '0:00';
+            const m = Math.floor(s / 60), sec = Math.floor(s % 60);
+            return m + ':' + String(sec).padStart(2, '0');
+        };
+
+        let seeking = false;
+
+        seek.addEventListener('input', () => {
+            seeking = true;   // 拖曳中不要被輪詢覆寫回去
+            const dur = yt?.getDuration?.() || 0;
+            tNow.textContent = fmt(dur * seek.value / 1000);
+        });
+        seek.addEventListener('change', () => {
+            const dur = yt?.getDuration?.() || 0;
+            if (dur > 0) yt.seekTo(dur * seek.value / 1000, true);
+            seeking = false;
+        });
+
+        setInterval(() => {
+            if (!yt?.getDuration || seeking) return;
+            const dur = yt.getDuration() || 0;
+            const cur = yt.getCurrentTime() || 0;
+            if (dur <= 0) return;
+            seek.value = Math.round(cur / dur * 1000);
+            tNow.textContent = fmt(cur);
+            tEnd.textContent = fmt(dur);
+            // 播放狀態可能被 YouTube 那端改變(例如自動接下一首),按鈕跟著同步
+            toggle.textContent = yt.getPlayerState() === YT.PlayerState.PLAYING ? '❚❚' : '▶';
+        }, 500);
     </script>
 }

@@ -34,9 +34,16 @@
                 <img src="@Model.PhotoPath" alt="作品照片"
                      style="width:100%;border-radius:10px;display:block" />
             </div>
-            <div class="iw-glass ratio ratio-16x9" style="margin-top:14px">
-                <iframe id="preview-player" src="" title="試聽" allowfullscreen
-                        allow="autoplay; encrypted-media" style="border:none"></iframe>
+            @*
+                試聽區。先前這裡放的是 <iframe src="">——空字串的 src 會被解析成「當前頁網址」,
+                等於一開始就多載一份東西進來,而且畫面上看不出是播放器。
+                改成先放提示,按「試聽」時才動態建立 iframe。
+            *@
+            <div id="preview-box" class="iw-glass ratio ratio-16x9" style="margin-top:14px;
+                 display:flex;align-items:center;justify-content:center">
+                <div class="iw-mono" id="preview-hint" style="text-align:center;line-height:1.9">
+                    點右側任一首的<br>「試聽」在這裡播放
+                </div>
             </div>
         </div>
 
@@ -94,11 +101,29 @@
 
 @section Scripts {
     <script>
-        // 點「試聽」把該影片載入左側播放器
+        // 點「試聽」在左側播放。iframe 到這時才建立——頁面一開始不需要它,
+        // 也避免空 src 被解析成當前頁網址。
+        const box = document.getElementById("preview-box");
+        let frame = null;
+
         document.querySelectorAll(".preview-btn").forEach(btn => {
             btn.addEventListener("click", () => {
-                document.getElementById("preview-player").src =
-                    `https://www.youtube.com/embed/${btn.dataset.videoId}?autoplay=1`;
+                if (!frame) {
+                    document.getElementById("preview-hint")?.remove();
+                    frame = document.createElement("iframe");
+                    frame.title = "試聽";
+                    frame.allow = "autoplay; encrypted-media";
+                    frame.allowFullscreen = true;
+                    frame.style.border = "none";
+                    box.appendChild(frame);
+                }
+                frame.src = `https://www.youtube.com/embed/${btn.dataset.videoId}?autoplay=1`;
+
+                // 播放器在左欄,視窗不夠高時會在畫面外——按了卻看不到東西動,
+                // 會以為功能壞了。捲進視野再標示目前播放中的是哪一首。
+                box.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                document.querySelectorAll(".preview-btn").forEach(b => b.classList.remove("is-on"));
+                btn.classList.add("is-on");
             });
         });
     </script>

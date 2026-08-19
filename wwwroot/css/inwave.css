@@ -13,13 +13,30 @@ body.iw{margin:0;background:var(--bg);color:var(--ink);font-family:Archivo,"Noto
 
 /* 背景:CD 眩光 + 音波環 + 掃描線 */
 .iw-bg{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
-.iw-glare{position:absolute;top:-360px;left:50%;margin-left:-460px;width:920px;height:920px;border-radius:50%;
-  filter:blur(46px);mix-blend-mode:screen;opacity:.55;animation:iw-glare 26s linear infinite;
-  background:conic-gradient(from 40deg,transparent 0deg,rgba(255,255,255,.55) 26deg,var(--accent) 52deg,var(--accent-2) 78deg,transparent 118deg,transparent 210deg,rgba(255,255,255,.35) 246deg,#F5D020 268deg,transparent 310deg)}
-.iw-ripple{position:absolute;left:50%;top:52%;width:760px;height:760px;margin:-380px 0 0 -380px;border-radius:50%;
-  border:1px solid rgba(159,232,255,.33);animation:iw-ripple 7s ease-out infinite}
+/* 眩光。原本是 920px 元素套 filter:blur(46px) 再無限旋轉縮放——瀏覽器每一幀都要
+   重算整片模糊,那是開啟頁面就開始掉幀的主因。改用本身就柔和的 conic + radial 遮罩:
+   外觀幾乎一樣,但完全不需要 blur,動畫也只剩 transform(可以交給合成器)。 */
+.iw-glare{position:absolute;top:-360px;left:var(--iw-center-x,50%);margin-left:-460px;width:920px;height:920px;border-radius:50%;
+  mix-blend-mode:screen;opacity:.5;animation:iw-glare 26s linear infinite;will-change:transform;
+  background:conic-gradient(from 40deg,transparent 0deg,rgba(255,255,255,.5) 40deg,var(--accent) 70deg,var(--accent-2) 100deg,transparent 150deg,transparent 210deg,rgba(255,255,255,.3) 250deg,#F5D020 275deg,transparent 320deg);
+  -webkit-mask-image:radial-gradient(circle at center,#000 22%,rgba(0,0,0,.45) 52%,transparent 74%);
+  mask-image:radial-gradient(circle at center,#000 22%,rgba(0,0,0,.45) 52%,transparent 74%)}
+
+/* 音波環。--iw-center-x 讓它跟著版面的視覺中心走:修圖頁右側有 400px 的側欄,
+   照片框的中心並不在 50vw,固定 left:50% 會明顯偏右(這是實際回報過的問題)。 */
+.iw-ripple{position:absolute;left:var(--iw-center-x,50%);top:52%;width:760px;height:760px;margin:-380px 0 0 -380px;border-radius:50%;
+  border:1px solid rgba(159,232,255,.33);animation:iw-ripple 7s ease-out infinite;will-change:transform,opacity}
 .iw-ripple:nth-child(2){animation-delay:1.75s}.iw-ripple:nth-child(3){animation-delay:3.5s}.iw-ripple:nth-child(4){animation-delay:5.25s}
-.iw-scan{position:absolute;inset:0;opacity:.055;mix-blend-mode:overlay;background:repeating-linear-gradient(0deg,#fff 0 1px,transparent 1px 3px)}
+/* 掃描線。拿掉 mix-blend-mode:overlay——全螢幕的混合模式會強迫整頁重新合成,
+   而它的不透明度只有 .055,視覺上看不出差別,成本卻是整頁的。 */
+.iw-scan{position:absolute;inset:0;opacity:.05;background:repeating-linear-gradient(0deg,#fff 0 1px,transparent 1px 3px)}
+
+/* 使用者若在系統設定關閉動態效果,就別播。這不只是無障礙,對低階機器也是效能保險。 */
+@media (prefers-reduced-motion: reduce){
+  .iw-glare,.iw-ripple,.iw-eq i{animation:none}
+  .iw-glare{opacity:.32}
+  .iw-ripple{opacity:.18;transform:scale(1.1)}
+}
 @keyframes iw-glare{0%{transform:rotate(0) scale(1)}50%{transform:rotate(180deg) scale(1.08)}100%{transform:rotate(360deg) scale(1)}}
 @keyframes iw-ripple{0%{transform:scale(.35);opacity:.55}100%{transform:scale(1.9);opacity:0}}
 @keyframes iw-wave{0%,100%{transform:scaleY(.18)}50%{transform:scaleY(1)}}
@@ -77,6 +94,23 @@ body.iw{margin:0;background:var(--bg);color:var(--ink);font-family:Archivo,"Noto
 .iw-player{position:fixed;left:0;right:0;bottom:0;z-index:40;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:24px;
   padding:14px 40px;background:rgba(6,6,8,.66);backdrop-filter:blur(24px) saturate(1.3);border-top:1px solid rgba(255,255,255,.14);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.16)}
+/* 一般文字輸入框(修圖頁的歌單名稱等)。與 .iw-glass 同一套語彙,但不加 backdrop-filter——
+   那東西每一個都要付合成成本,表單欄位不值得。 */
+.iw-input{width:100%;box-sizing:border-box;padding:12px 14px;border-radius:10px;
+  border:1px solid var(--line);background:rgba(255,255,255,.045);color:var(--ink);
+  font-family:inherit;font-size:14px;outline:none;transition:border-color .18s ease,background .18s ease}
+.iw-input::placeholder{color:rgba(255,255,255,.32)}
+.iw-input:focus{border-color:var(--accent);background:rgba(255,255,255,.07)}
+
+/* 播放進度條。刻意做得比一般滑桿細,拇指(thumb)只在 hover 時放大——
+   它是狀態顯示,不是主要控制項,不該一直搶視線。 */
+.iw-seek{-webkit-appearance:none;appearance:none;height:4px;border-radius:2px;background:rgba(255,255,255,.18);cursor:pointer;outline:none}
+.iw-seek::-webkit-slider-thumb{-webkit-appearance:none;width:10px;height:10px;border-radius:50%;background:var(--accent);
+  box-shadow:0 0 0 3px rgba(159,232,255,.18);transition:transform .15s ease}
+.iw-seek:hover::-webkit-slider-thumb,.iw-seek:focus-visible::-webkit-slider-thumb{transform:scale(1.35)}
+.iw-seek::-moz-range-thumb{width:10px;height:10px;border:none;border-radius:50%;background:var(--accent)}
+.iw-seek:focus-visible{box-shadow:0 0 0 2px var(--accent)}
+
 .iw-eq{display:flex;align-items:flex-end;gap:2px;height:16px;width:16px;flex:none}
 .iw-eq i{flex:1;height:100%;transform-origin:bottom;animation:iw-eq .9s ease-in-out infinite}
 .iw-eq i:nth-child(1){background:var(--accent)}.iw-eq i:nth-child(2){background:var(--accent-2);animation-delay:.25s}.iw-eq i:nth-child(3){background:#fff;animation-delay:.5s}
@@ -86,7 +120,13 @@ body.iw{margin:0;background:var(--bg);color:var(--ink);font-family:Archivo,"Noto
 .iw-btn-ghost:hover{background:transparent;border-color:#fff;color:#fff}
 
 /* 修圖頁 */
+/* 修圖頁右側固定 400px 側欄,所以照片框的視覺中心是 (100% - 400px) / 2。
+   把它告訴背景層,音波環才會跟照片同心;否則環會偏右約 200px。 */
 .iw-edit{display:grid;grid-template-columns:1fr 400px;min-height:calc(100vh - 61px)}
+body:has(.iw-edit){--iw-center-x:calc((100% - 400px) / 2)}
+@media (max-width:1024px){
+  body:has(.iw-edit){--iw-center-x:50%}
+}
 .iw-edit-canvas{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:44px}
 .iw-edit-canvas .frame{position:relative;width:100%;max-width:720px;aspect-ratio:4/3;border-radius:12px;overflow:hidden;
   border:1px solid rgba(255,255,255,.18);box-shadow:0 40px 90px rgba(0,0,0,.7)}

@@ -25,6 +25,7 @@ public class PhotoAnalysisService : IPhotoAnalysisService
         string mimeType,
         string? mood,
         string? filter,
+        string? playlistName,
         int brightness,
         int contrast,
         int saturation,
@@ -48,6 +49,7 @@ public class PhotoAnalysisService : IPhotoAnalysisService
         };
         if (!string.IsNullOrWhiteSpace(mood)) payload["mood"] = mood;
         if (!string.IsNullOrWhiteSpace(filter)) payload["filter"] = filter;
+        if (!string.IsNullOrWhiteSpace(playlistName)) payload["playlistName"] = playlistName;
 
         using var request = new HttpRequestMessage(HttpMethod.Post, url)
         {

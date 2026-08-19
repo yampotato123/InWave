@@ -12,6 +12,13 @@ public class Photo
 
     public DateTime CreatedAt { get; set; }
 
+    /// <summary>
+    /// 使用者在修圖頁替這份歌單取的名字。**會一併送進 AI 的 prompt** ——
+    /// 那是使用者對這份歌單最直接的意圖表達（「夏天的海邊」比任何滑桿都準）。
+    /// 沒取名為 null,此時 prompt 不送這個欄位。
+    /// </summary>
+    public string? PlaylistName { get; set; }
+
     public PhotoEdit? Edit { get; set; }
     public MoodProfile? Mood { get; set; }
 

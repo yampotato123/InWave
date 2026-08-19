@@ -17,6 +17,21 @@ public class EditViewModel
     public int Contrast { get; set; } = 100;
     public int Saturation { get; set; } = 100;
 
+    /// <summary>色溫 −100（冷）–100（暖）。注意這組的原點是 0,不是 100。</summary>
+    public int Temperature { get; set; }
+
+    /// <summary>銳利度 0–100</summary>
+    public int Sharpness { get; set; }
+
+    /// <summary>柔焦 0–100</summary>
+    public int Softness { get; set; }
+
+    /// <summary>色調曲線的五個控制點,逗號分隔;見 PhotoEdit.CurvePoints。</summary>
+    public string? CurvePoints { get; set; }
+
+    /// <summary>使用者替這份歌單取的名字,會進 AI 的 prompt。</summary>
+    public string? PlaylistName { get; set; }
+
     /// <summary>濾鏡名稱,取值見 Services/PhotoFilters.All;不套濾鏡為 null 或空字串。</summary>
     public string? FilterName { get; set; }
 

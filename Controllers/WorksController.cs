@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using InWave.Data;
@@ -123,7 +124,12 @@ public class WorksController : Controller
             Brightness = edit.Brightness,
             Contrast = edit.Contrast,
             Saturation = edit.Saturation,
+            Temperature = edit.Temperature,
+            Sharpness = edit.Sharpness,
+            Softness = edit.Softness,
+            CurvePoints = edit.CurvePoints,
             FilterName = edit.FilterName,
+            PlaylistName = photo.PlaylistName,
         });
     }
 
@@ -175,7 +181,19 @@ public class WorksController : Controller
         edit.Brightness = Math.Clamp(vm.Brightness, 0, 200);
         edit.Contrast = Math.Clamp(vm.Contrast, 0, 200);
         edit.Saturation = Math.Clamp(vm.Saturation, 0, 200);
+        // 色溫的原點是 0(不是 100),範圍兩側對稱
+        edit.Temperature = Math.Clamp(vm.Temperature, -100, 100);
+        edit.Sharpness = Math.Clamp(vm.Sharpness, 0, 100);
+        edit.Softness = Math.Clamp(vm.Softness, 0, 100);
+        edit.CurvePoints = NormalizeCurve(vm.CurvePoints);
         edit.FilterName = filterName;
+
+        // 歌單名稱會進 AI 的 prompt。留空就當作沒取名(送 null,prompt 不帶這段),
+        // 上限與 Playlist.Name 的欄位一致,避免這裡收得下、存歌單時卻爆掉。
+        var playlistName = vm.PlaylistName?.Trim();
+        photo.PlaylistName = string.IsNullOrEmpty(playlistName)
+            ? null
+            : playlistName[..Math.Min(playlistName.Length, 60)];
 
         photo.EditedPath = "/uploads/" + editedName;
         await _db.SaveChangesAsync();
@@ -248,10 +266,12 @@ public class WorksController : Controller
             PhotoPath = photo.EditedPath ?? photo.OriginalPath,
             MoodName = photo.Mood.MoodName,
             SearchKeyword = searchDescription,
-            // 情緒未指定時不要留下開頭孤伶伶的「・」
-            PlaylistName = string.IsNullOrEmpty(photo.Mood.MoodName)
-                ? $"作品・{DateTime.Now:MM/dd}"
-                : $"{photo.Mood.MoodName}・{DateTime.Now:MM/dd}",
+            // 使用者在修圖頁取過名就用他的;沒取才用情緒 + 日期。
+            // 情緒也未指定時不要留下開頭孤伶伶的「・」
+            PlaylistName = photo.PlaylistName
+                ?? (string.IsNullOrEmpty(photo.Mood.MoodName)
+                    ? $"作品・{DateTime.Now:MM/dd}"
+                    : $"{photo.Mood.MoodName}・{DateTime.Now:MM/dd}"),
             AnalyzedAt = photo.Analysis?.AnalyzedAt,
             Songs = results.Select(r => new SongInput
             {
@@ -348,6 +368,7 @@ public class WorksController : Controller
             // MoodName 用空字串當「未指定」的哨兵值(2026-08-17 定案,零 migration)
             mood: string.IsNullOrEmpty(photo.Mood!.MoodName) ? null : photo.Mood.MoodName,
             filter: photo.Edit?.FilterName,
+            playlistName: photo.PlaylistName,
             brightness: photo.Edit?.Brightness ?? 100,
             contrast: photo.Edit?.Contrast ?? 100,
             saturation: photo.Edit?.Saturation ?? 100);
@@ -428,6 +449,34 @@ public class WorksController : Controller
                 resolved.Add(found);
         }
         return resolved;
+    }
+
+    /// <summary>
+    /// 把表單送來的色調曲線正規化成「五個 0–1 的數字」。
+    ///
+    /// **這個值會被寫進頁面的 SVG 屬性**,所以不能直接信任表單內容——
+    /// 只接受五個可解析的數字,任何一項不合就整條退回預設的對角線。
+    /// 用 InvariantCulture 解析與輸出:伺服器若在使用逗號當小數點的地區設定下執行,
+    /// 「0.25」會被解析失敗,而輸出的「0,25」又會多切出一個欄位。
+    /// </summary>
+    private static string NormalizeCurve(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+            return PhotoEdit.IdentityCurve;
+
+        var parts = raw.Split(',', StringSplitOptions.TrimEntries);
+        if (parts.Length != 5)
+            return PhotoEdit.IdentityCurve;
+
+        var values = new double[5];
+        for (var i = 0; i < 5; i++)
+        {
+            if (!double.TryParse(parts[i], NumberStyles.Float, CultureInfo.InvariantCulture, out var v))
+                return PhotoEdit.IdentityCurve;
+            values[i] = Math.Clamp(v, 0, 1);
+        }
+
+        return string.Join(',', values.Select(v => v.ToString("0.###", CultureInfo.InvariantCulture)));
     }
 
     private static string MimeTypeOf(string path) => Path.GetExtension(path).ToLowerInvariant() switch

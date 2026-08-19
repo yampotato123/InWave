@@ -32,11 +32,13 @@
             <a class="@PillClass(controller == "Works" && action == "Index")"
                asp-controller="Works" asp-action="Index">一 我的歌單</a>
             <a class="@PillClass(controller == "Works" && (action == "Create" || action == "Edit"))"
-               asp-controller="Works" asp-action="Create">二 修圖</a>
+               asp-controller="Works" asp-action="Create">二 建立新歌單</a>
             <a class="@PillClass(controller == "Works" && (action == "Details" || action == "Recommend"))"
                asp-controller="Works" asp-action="Index">三 播放</a>
         </nav>
-        <div class="iw-mono" style="text-align:right">收藏庫 Library</div>
+        @* 先前這裡是純文字 div,看起來像按鈕卻點不動 *@
+        <a class="iw-mono" style="text-align:right;text-decoration:none"
+           asp-controller="Works" asp-action="Index">收藏庫 Library</a>
     </header>
 
     @RenderBody()

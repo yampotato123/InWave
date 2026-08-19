@@ -19,15 +19,42 @@
     <input type="hidden" asp-for="PhotoId" />
     <input type="hidden" asp-for="EditedImage" id="editedImage" />
 
+    @*
+        銳化用的 SVG 卷積核。canvas 的 ctx.filter 可以吃 url(#id) 並與其他 filter 函式串接
+        （2026-08-20 在 Chrome 實測確認）。矩陣的中心值由 JS 依滑桿改寫:
+        中心 = 1 + 4a、四邊 = −a，總和恆為 1，所以不會整體變亮或變暗。
+    *@
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+        <filter id="iw-sharpen">
+            <feConvolveMatrix id="sharpenKernel" order="3" preserveAlpha="true"
+                              kernelMatrix="0 0 0  0 1 0  0 0 0" />
+        </filter>
+        @*
+            色調曲線。tableValues 就是曲線的五個控制點,SVG 會自己在點之間內插,
+            所以不需要任何插值計算,也不必逐像素跑 JS——整條曲線是 GPU 在做。
+            R/G/B 三通道套同一條(亮度曲線)。
+        *@
+        <filter id="iw-curve">
+            <feComponentTransfer>
+                <feFuncR id="curveR" type="table" tableValues="0 0.25 0.5 0.75 1" />
+                <feFuncG id="curveG" type="table" tableValues="0 0.25 0.5 0.75 1" />
+                <feFuncB id="curveB" type="table" tableValues="0 0.25 0.5 0.75 1" />
+            </feComponentTransfer>
+        </filter>
+    </svg>
+
     <div class="iw-edit-canvas">
         <div class="frame">
             <canvas id="preview"></canvas>
             <img id="source" src="@Model.PhotoPath" alt="" style="display:none">
         </div>
-        <div class="iw-mono" style="display:flex;gap:26px">
+        <div class="iw-mono" style="display:flex;gap:20px;flex-wrap:wrap;justify-content:center">
             <span>Brightness <b id="vB">@Model.Brightness</b></span>
             <span>Contrast <b id="vC">@Model.Contrast</b></span>
             <span>Saturation <b id="vS">@Model.Saturation</b></span>
+            <span>Temp <b id="vT">@Model.Temperature</b></span>
+            <span>Sharp <b id="vK">@Model.Sharpness</b></span>
+            <span>Soft <b id="vF">@Model.Softness</b></span>
         </div>
     </div>
 
@@ -50,6 +77,47 @@
                 <span style="display:flex;justify-content:space-between;margin-bottom:11px"><span>飽和度 Saturation</span></span>
                 <input class="iw-range" type="range" min="0" max="200" asp-for="Saturation" data-k="s" />
             </label>
+            <label>
+                <span style="display:flex;justify-content:space-between;margin-bottom:11px">
+                    <span>色溫 Temperature</span><span class="iw-mono" style="font-size:9px">冷 ↔ 暖</span>
+                </span>
+                <input class="iw-range" type="range" min="-100" max="100" asp-for="Temperature" data-k="t" />
+            </label>
+            <label>
+                <span style="display:flex;justify-content:space-between;margin-bottom:11px"><span>銳利度 Sharpness</span></span>
+                <input class="iw-range" type="range" min="0" max="100" asp-for="Sharpness" data-k="k" />
+            </label>
+            <label>
+                <span style="display:flex;justify-content:space-between;margin-bottom:11px"><span>柔焦 Softness</span></span>
+                <input class="iw-range" type="range" min="0" max="100" asp-for="Softness" data-k="f" />
+            </label>
+        </div>
+
+        <div>
+            <div class="iw-mono" style="margin-bottom:12px">色調曲線 Tone curve</div>
+            <div style="display:flex;gap:14px;align-items:flex-start">
+                <canvas id="curve" width="150" height="150"
+                        style="border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.03);
+                               touch-action:none;cursor:ns-resize;flex:none"></canvas>
+                <div class="iw-mono" style="font-size:9px;line-height:2;color:var(--muted)">
+                    上下拖曳五個點<br>
+                    左邊＝暗部<br>
+                    右邊＝亮部<br>
+                    <button type="button" id="curveReset" class="iw-pill" style="margin-top:8px">拉直</button>
+                </div>
+            </div>
+            <input type="hidden" asp-for="CurvePoints" id="curveInput" />
+        </div>
+
+        <div>
+            <label class="iw-mono" for="PlaylistName" style="display:block;margin-bottom:10px">
+                歌單名稱 Playlist name · 會告訴 AI 你想要什麼
+            </label>
+            <input class="iw-input" asp-for="PlaylistName" maxlength="60" autocomplete="off"
+                   placeholder="例:夏天的海邊、下班後的深夜" />
+            <div class="iw-mono" style="font-size:9px;margin-top:8px;line-height:1.7;color:var(--muted)">
+                取的名字會一起送給 AI —— 它比任何滑桿都更能表達你要的氣氛。留白也可以。
+            </div>
         </div>
 
         <div>
@@ -99,12 +167,109 @@
             string.IsNullOrEmpty(Model.MoodName) ? (string?)null : MoodKeywordMapper.GetKeyword(Model.MoodName)));
         let mod = @Html.Raw(Json.Serialize(currentModifier));
 
+        const kernel = document.getElementById('sharpenKernel');
+
+        // ── 色調曲線 ──────────────────────────────────────────────
+        // 五個控制點,X 固定在 0 / .25 / .5 / .75 / 1,只能上下拖。
+        // 這五個 Y 值直接就是 SVG 的 tableValues,不需要任何轉換。
+        const IDENTITY = [0, 0.25, 0.5, 0.75, 1];
+        const curveCv = document.getElementById('curve');
+        const curveCtx = curveCv.getContext('2d');
+        const curveInput = document.getElementById('curveInput');
+        const funcs = ['curveR', 'curveG', 'curveB'].map(id => document.getElementById(id));
+
+        function parseCurve(s) {
+            const a = (s ?? '').split(',').map(Number);
+            return (a.length === 5 && a.every(n => Number.isFinite(n) && n >= 0 && n <= 1))
+                ? a : IDENTITY.slice();
+        }
+        let pts = parseCurve(curveInput.value);
+
+        function drawCurve() {
+            const w = curveCv.width, h = curveCv.height;
+            curveCtx.clearRect(0, 0, w, h);
+
+            // 格線與對角參考線:沒有它們就看不出自己把曲線拉離原點多遠
+            curveCtx.strokeStyle = 'rgba(255,255,255,.10)';
+            curveCtx.lineWidth = 1;
+            for (let i = 1; i < 4; i++) {
+                const p = Math.round(i * w / 4) + 0.5;
+                curveCtx.beginPath(); curveCtx.moveTo(p, 0); curveCtx.lineTo(p, h); curveCtx.stroke();
+                curveCtx.beginPath(); curveCtx.moveTo(0, p); curveCtx.lineTo(w, p); curveCtx.stroke();
+            }
+            curveCtx.setLineDash([3, 3]);
+            curveCtx.beginPath(); curveCtx.moveTo(0, h); curveCtx.lineTo(w, 0); curveCtx.stroke();
+            curveCtx.setLineDash([]);
+
+            const x = i => i * (w - 1) / 4;
+            const y = v => (1 - v) * (h - 1);
+
+            curveCtx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--accent') || '#9FE8FF';
+            curveCtx.lineWidth = 2;
+            curveCtx.beginPath();
+            curveCtx.moveTo(x(0), y(pts[0]));
+            for (let i = 1; i < 5; i++) curveCtx.lineTo(x(i), y(pts[i]));
+            curveCtx.stroke();
+
+            curveCtx.fillStyle = '#fff';
+            for (let i = 0; i < 5; i++) {
+                curveCtx.beginPath();
+                curveCtx.arc(x(i), y(pts[i]), 4, 0, Math.PI * 2);
+                curveCtx.fill();
+            }
+        }
+
+        function applyCurve() {
+            const table = pts.map(v => v.toFixed(3)).join(' ');
+            funcs.forEach(f => f.setAttribute('tableValues', table));
+            curveInput.value = pts.map(v => v.toFixed(3)).join(',');
+            drawCurve();
+            // SVG 濾鏡改了之後 canvas 不會自動重畫,要自己觸發
+            draw();
+        }
+
+        let dragging = -1;
+        function nearestPoint(offsetX) {
+            return Math.max(0, Math.min(4, Math.round(offsetX / (curveCv.width - 1) * 4)));
+        }
+        function setFromPointer(e) {
+            const r = curveCv.getBoundingClientRect();
+            const yy = (e.clientY - r.top) / r.height;
+            pts[dragging] = Math.max(0, Math.min(1, 1 - yy));
+            applyCurve();
+        }
+        curveCv.addEventListener('pointerdown', e => {
+            const r = curveCv.getBoundingClientRect();
+            dragging = nearestPoint(e.clientX - r.left);
+            curveCv.setPointerCapture(e.pointerId);
+            setFromPointer(e);
+        });
+        curveCv.addEventListener('pointermove', e => { if (dragging >= 0) setFromPointer(e); });
+        curveCv.addEventListener('pointerup', () => { dragging = -1; });
+        curveCv.addEventListener('pointercancel', () => { dragging = -1; });
+        document.getElementById('curveReset').addEventListener('click', () => {
+            pts = IDENTITY.slice(); applyCurve();
+        });
+
         function vals() {
-            return {
-                b: +document.querySelector('[data-k=b]').value,
-                c: +document.querySelector('[data-k=c]').value,
-                s: +document.querySelector('[data-k=s]').value
-            };
+            const g = k => +document.querySelector(`[data-k=${k}]`).value;
+            return { b: g('b'), c: g('c'), s: g('s'), t: g('t'), k: g('k'), f: g('f') };
+        }
+
+        // 色溫沒有對應的 CSS filter 函式,用 sepia + hue-rotate 合成:
+        // sepia 先把畫面推向暖褐,再用 hue-rotate 決定要偏橘(暖)還是偏藍(冷)。
+        // 強度取 |t|,所以 t=0 時完全不套用,避免原圖被無謂地改色。
+        function tempFilter(t) {
+            if (t === 0) return '';
+            const amount = Math.min(Math.abs(t), 100) * 0.45;      // 最多 45% sepia,再多就變舊照片
+            const rotate = t > 0 ? -12 * (t / 100) : 190 * (-t / 100);
+            return `sepia(${amount.toFixed(1)}%) hue-rotate(${rotate.toFixed(1)}deg)`;
+        }
+
+        // 3x3 銳化核。中心 1+4a、四邊 −a,總和恆為 1 → 只提高邊緣對比,不改變整體亮度。
+        function setSharpen(k) {
+            const a = (k / 100) * 0.8;
+            kernel.setAttribute('kernelMatrix', `0 ${-a} 0  ${-a} ${1 + 4 * a} ${-a}  0 ${-a} 0`);
         }
 
         function draw() {
@@ -114,17 +279,29 @@
                 cv.width = Math.round(img.naturalWidth * scale);
                 cv.height = Math.round(img.naturalHeight * scale);
             }
-            // CSS filter 的同名函式是連乘的,所以濾鏡會疊在滑桿之上,這是預期行為
-            ctx.filter = `brightness(${v.b}%) contrast(${v.c}%) saturate(${v.s}%) ${mod !== 'none' ? CSSF[mod] : ''}`.trim();
+            setSharpen(v.k);
+            // CSS filter 的同名函式是連乘的,所以濾鏡會疊在滑桿之上,這是預期行為。
+            // 銳化放最前面:先銳化再調色,才不會把調色產生的雜訊一起放大。
+            const curved = pts.some((p, i) => Math.abs(p - IDENTITY[i]) > 0.001);
+            ctx.filter = [
+                v.k > 0 ? 'url(#iw-sharpen)' : '',
+                curved ? 'url(#iw-curve)' : '',
+                `brightness(${v.b}%)`, `contrast(${v.c}%)`, `saturate(${v.s}%)`,
+                tempFilter(v.t),
+                v.f > 0 ? `blur(${(v.f / 100 * 8).toFixed(2)}px)` : '',
+                mod !== 'none' ? CSSF[mod] : ''
+            ].filter(Boolean).join(' ');
             ctx.clearRect(0, 0, cv.width, cv.height);
             ctx.drawImage(img, 0, 0, cv.width, cv.height);
             vB.textContent = v.b; vC.textContent = v.c; vS.textContent = v.s;
+            vT.textContent = v.t; vK.textContent = v.k; vF.textContent = v.f;
             keyword.textContent = BASE_KEYWORD === null
                 ? '由 AI 判讀後決定'
                 : BASE_KEYWORD + (mod !== 'none' ? ' ' + mod : '');
         }
 
         img.onload = draw;
+        applyCurve();   // 把存檔的曲線套上 SVG 與畫布,並畫出曲線圖
         if (img.complete && img.naturalWidth) draw();
 
         document.querySelectorAll('.iw-range').forEach(r => r.addEventListener('input', draw));
@@ -133,11 +310,15 @@
             l.classList.add('is-on'); mod = l.dataset.mod; draw();
         }));
         document.getElementById('reset').addEventListener('click', () => {
-            document.querySelectorAll('.iw-range').forEach(r => r.value = 100);
+            // 三個百分比滑桿的原點是 100,色溫/銳利/柔焦的原點是 0——不能一律設 100
+            document.querySelectorAll('.iw-range').forEach(r => {
+                r.value = ['b', 'c', 's'].includes(r.dataset.k) ? 100 : 0;
+            });
             mod = 'none';
             document.querySelectorAll('.iw-filter').forEach((x, i) => x.classList.toggle('is-on', i === 0));
             document.querySelector('.iw-filter input').checked = true;
-            draw();
+            pts = IDENTITY.slice();
+            applyCurve();   // 內部會呼叫 draw()
         });
         document.getElementById('editForm').addEventListener('submit', () => {
             document.getElementById('editedImage').value = cv.toDataURL('image/jpeg', 0.85);
