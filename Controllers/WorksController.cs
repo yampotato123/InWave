@@ -266,12 +266,9 @@ public class WorksController : Controller
             PhotoPath = photo.EditedPath ?? photo.OriginalPath,
             MoodName = photo.Mood.MoodName,
             SearchKeyword = searchDescription,
-            // 使用者在修圖頁取過名就用他的;沒取才用情緒 + 日期。
-            // 情緒也未指定時不要留下開頭孤伶伶的「・」
-            PlaylistName = photo.PlaylistName
-                ?? (string.IsNullOrEmpty(photo.Mood.MoodName)
-                    ? $"作品・{DateTime.Now:MM/dd}"
-                    : $"{photo.Mood.MoodName}・{DateTime.Now:MM/dd}"),
+            // 使用者在修圖頁取過名就帶出來;沒取就留空,建議名只當 placeholder。
+            PlaylistName = photo.PlaylistName ?? "",
+            SuggestedName = SuggestNameFor(photo),
             AnalyzedAt = photo.Analysis?.AnalyzedAt,
             Songs = results.Select(r => new SongInput
             {
@@ -479,6 +476,15 @@ public class WorksController : Controller
         return string.Join(',', values.Select(v => v.ToString("0.###", CultureInfo.InvariantCulture)));
     }
 
+    /// <summary>
+    /// 沒取名時的建議歌單名稱:情緒・日期。情緒也未指定時不要留下開頭孤伶伶的「・」。
+    /// 顯示與存檔都用這一個方法算,兩邊不會不一致。
+    /// </summary>
+    private static string SuggestNameFor(Photo photo) =>
+        string.IsNullOrEmpty(photo.Mood?.MoodName)
+            ? $"作品・{DateTime.Now:MM/dd}"
+            : $"{photo.Mood.MoodName}・{DateTime.Now:MM/dd}";
+
     private static string MimeTypeOf(string path) => Path.GetExtension(path).ToLowerInvariant() switch
     {
         ".png" => "image/png",
@@ -538,8 +544,18 @@ public class WorksController : Controller
         var selected = vm.Songs.Where(s => s.Selected).ToList();
         if (selected.Count == 0)
             ModelState.AddModelError("", "至少勾選一首歌。");
+
+        // 名稱留白是允許的:畫面上的 placeholder 已經說明會用什麼名字存。
+        // 建議名在伺服器端重算,不採信表單帶回來的值。
         if (string.IsNullOrWhiteSpace(vm.PlaylistName))
-            ModelState.AddModelError("", "請輸入歌單名稱。");
+        {
+            var named = await _db.Photos.Include(p => p.Mood)
+                .FirstOrDefaultAsync(p => p.Id == vm.PhotoId);
+            if (named == null)
+                return NotFound();
+            vm.PlaylistName = SuggestNameFor(named);
+        }
+        var playlistName = vm.PlaylistName!.Trim();
 
         if (!ModelState.IsValid)
         {
@@ -554,7 +570,7 @@ public class WorksController : Controller
 
         var playlist = new Playlist
         {
-            Name = vm.PlaylistName.Trim(),
+            Name = playlistName,
             PhotoId = vm.PhotoId,
             CreatedAt = DateTime.UtcNow,
         };

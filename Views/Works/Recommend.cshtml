@@ -34,17 +34,6 @@
                 <img src="@Model.PhotoPath" alt="作品照片"
                      style="width:100%;border-radius:10px;display:block" />
             </div>
-            @*
-                試聽區。先前這裡放的是 <iframe src="">——空字串的 src 會被解析成「當前頁網址」,
-                等於一開始就多載一份東西進來,而且畫面上看不出是播放器。
-                改成先放提示,按「試聽」時才動態建立 iframe。
-            *@
-            <div id="preview-box" class="iw-glass ratio ratio-16x9" style="margin-top:14px;
-                 display:flex;align-items:center;justify-content:center">
-                <div class="iw-mono" id="preview-hint" style="text-align:center;line-height:1.9">
-                    點右側任一首的<br>「試聽」在這裡播放
-                </div>
-            </div>
         </div>
 
         <div>
@@ -56,13 +45,30 @@
                 <input type="hidden" asp-for="MoodName" />
                 <input type="hidden" asp-for="SearchKeyword" />
 
+                @*
+                    這裡不預先填入名稱。先前會自動填成「情緒・日期」,看起來像系統替你取了名字,
+                    容易誤會那個名字會影響 AI —— 其實判讀在上一步(修圖頁)就完成了。
+                    改成放進 placeholder:留白就用它,而「我沒取名」這件事在畫面上是看得見的。
+                *@
                 <div class="iw-mono" style="margin-bottom:10px">歌單名稱 Playlist name</div>
-                <input asp-for="PlaylistName" class="iw-input" placeholder="幫這份歌單取個名字"
-                       style="font-family:inherit" />
+                <input asp-for="PlaylistName" class="iw-input"
+                       placeholder="@Model.SuggestedName" style="font-family:inherit" />
+                <input type="hidden" asp-for="SuggestedName" />
+                <div class="iw-mono" style="font-size:9px;margin-top:8px;color:var(--muted)">
+                    留白就用「@Model.SuggestedName」。這個名字只用來存檔 —— AI 判讀在上一步已經完成。
+                </div>
 
                 <div class="iw-mono" style="margin:30px 0 10px">
                     勾選要收進歌單的歌 · @Model.Songs.Count 首
                 </div>
+
+                @*
+                    試聽播放器。先前放在左欄照片下方,離「試聽」按鈕很遠,
+                    而且視窗不夠高時在畫面外——按了看不到反應(使用者回報)。
+                    改成放在歌曲清單正上方,按下去就在眼前展開。
+                *@
+                <div id="preview-box" class="iw-glass ratio ratio-16x9" hidden
+                     style="margin-bottom:12px"></div>
 
                 <div class="iw-glass" style="padding:6px 8px">
                     @for (var i = 0; i < Model.Songs.Count; i++)
@@ -109,7 +115,7 @@
         document.querySelectorAll(".preview-btn").forEach(btn => {
             btn.addEventListener("click", () => {
                 if (!frame) {
-                    document.getElementById("preview-hint")?.remove();
+                    box.hidden = false;
                     frame = document.createElement("iframe");
                     frame.title = "試聽";
                     frame.allow = "autoplay; encrypted-media";
