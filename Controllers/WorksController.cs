@@ -71,6 +71,10 @@ public class WorksController : Controller
             ModelState.AddModelError("", "照片超過 10 MB,請換一張或先壓縮。");
         else if (!AllowedExtensions.Contains(Path.GetExtension(photoFile.FileName).ToLowerInvariant()))
             ModelState.AddModelError("", "只接受 jpg、png、webp 圖片。");
+        else if (!await HasSupportedImageHeaderAsync(photoFile))
+            // 副檔名可以隨便改,檔案內容不會騙人。擋掉改名成 .jpg 的非圖片檔,
+            // 才不會把它存進 uploads 再交給瀏覽器與 n8n/模型去解析。
+            ModelState.AddModelError("", "這個檔案看起來不是有效的圖片,只認得 jpg、png、webp。");
 
         // 情緒可以不選,交給 AI 判讀(設計文件 §3.2.1)。被逼著八選一時使用者只是挑個最接近的,
         // 那不是意圖是雜訊,卻會錨定 AI。有選的話仍必須是 AllMoods 之一。
@@ -211,6 +215,15 @@ public class WorksController : Controller
         await _db.SaveChangesAsync();
 
         return RedirectToAction(nameof(Recommend), new { photoId = photo.Id });
+    }
+
+    /// <summary>讀檔案開頭的 magic bytes,確認內容真的是圖片(只驗副檔名擋不住改名的假圖)。</summary>
+    private static async Task<bool> HasSupportedImageHeaderAsync(IFormFile file)
+    {
+        var header = new byte[12];
+        await using var stream = file.OpenReadStream();
+        var read = await stream.ReadAsync(header);
+        return InputValidation.IsSupportedImageHeader(header.AsSpan(0, read));
     }
 
     /// <summary>解出 data URL 裡的 JPEG 位元組;前綴不對或 base64 壞掉回 null。</summary>
@@ -659,6 +672,9 @@ public class WorksController : Controller
         var selected = vm.Songs.Where(s => s.Selected).ToList();
         if (selected.Count == 0)
             ModelState.AddModelError("", "至少勾選一首歌。");
+        else if (selected.Any(s => !InputValidation.IsYoutubeVideoId(s.VideoId)))
+            // 這些 VideoId 來自推薦頁的隱藏欄位,正常一定是 11 碼合法 ID;不合法代表被竄改
+            ModelState.AddModelError("", "歌曲資料格式不正確,請重新整理推薦頁後再試一次。");
 
         // 名稱留白是允許的:畫面上的 placeholder 已經說明會用什麼名字存。
         // 建議名在伺服器端重算,不採信表單帶回來的值。
