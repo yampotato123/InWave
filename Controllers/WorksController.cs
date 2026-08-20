@@ -492,6 +492,78 @@ public class WorksController : Controller
         _ => "image/jpeg",
     };
 
+    // POST /Works/Delete — 從收藏庫刪掉一份歌單
+    //
+    // **這是不可逆的**,所以行為要講清楚:
+    //   刪 Playlist 與它的 PlaylistSong(連鎖)
+    //   若這張照片沒有其他歌單了,連照片本身一起刪:Photo(連鎖帶走 PhotoEdit /
+    //   MoodProfile / PhotoAnalysis)以及硬碟上的原圖與合成圖
+    //   **不刪 Song** —— 那是多份歌單共用的目錄,刪了會弄壞別人的歌單
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Delete(int id)
+    {
+        var playlist = await _db.Playlists
+            .Include(p => p.Photo)
+            .FirstOrDefaultAsync(p => p.Id == id);
+        if (playlist == null)
+            return NotFound();
+
+        var photo = playlist.Photo;
+        var name = playlist.Name;
+
+        // 這張照片還有沒有別的歌單?有的話只刪歌單,照片留著。
+        var otherPlaylists = await _db.Playlists
+            .CountAsync(p => p.PhotoId == playlist.PhotoId && p.Id != playlist.Id);
+
+        _db.Playlists.Remove(playlist);
+
+        var deletedPhoto = false;
+        if (otherPlaylists == 0 && photo != null)
+        {
+            // 先記下路徑:SaveChanges 之後實體就沒了
+            var paths = new[] { photo.OriginalPath, photo.EditedPath }
+                .Where(p => !string.IsNullOrEmpty(p))
+                .ToList();
+
+            _db.Photos.Remove(photo);   // 連鎖帶走 PhotoEdit / MoodProfile / PhotoAnalysis
+            await _db.SaveChangesAsync();
+            deletedPhoto = true;
+
+            // 檔案最後才刪:資料庫失敗的話檔案還在,比反過來好。
+            // 路徑一律由資料庫的值推導並限制在 uploads 目錄內,不吃任何使用者輸入。
+            var uploadDir = Path.GetFullPath(Path.Combine(_env.WebRootPath, "uploads"));
+            foreach (var rel in paths)
+            {
+                var full = Path.GetFullPath(Path.Combine(_env.WebRootPath, rel!.TrimStart('/')));
+                if (!full.StartsWith(uploadDir, StringComparison.Ordinal))
+                {
+                    _logger.LogWarning("拒絕刪除 uploads 以外的路徑:{Path}", full);
+                    continue;
+                }
+                try
+                {
+                    if (System.IO.File.Exists(full)) System.IO.File.Delete(full);
+                }
+                catch (IOException ex)
+                {
+                    // 刪不掉不該讓整個操作失敗——資料庫已經清乾淨了,留下的只是孤兒檔
+                    _logger.LogWarning(ex, "刪除檔案失敗:{Path}", full);
+                }
+            }
+        }
+        else
+        {
+            await _db.SaveChangesAsync();
+        }
+
+        _logger.LogInformation("已刪除歌單「{Name}」(id={Id}),照片{PhotoState}", name, id,
+            deletedPhoto ? "一併刪除" : "保留(還有其他歌單使用)");
+
+        TempData["Deleted"] = name;
+        return RedirectToAction(nameof(Index));
+    }
+
     // POST /Works/Reanalyze — 重新問一次 AI(改了 prompt 之後用得到)
     //
     // **先做完新判讀,成功才覆蓋舊的。** 不能先刪再重判:AI 會失敗

@@ -19,6 +19,10 @@
                    display:flex;align-items:baseline;gap:18px;flex-wrap:wrap">
         <h1 class="iw-serif" style="margin:0;font-size:clamp(30px,4vw,46px);line-height:1">收藏庫</h1>
         <span class="iw-mono">@Model.Count 份歌單</span>
+        @if (TempData["Deleted"] is string deletedName)
+        {
+            <span class="iw-mono" style="color:var(--accent)">已刪除「@deletedName」</span>
+        }
 
         @if (moods.Count > 1)
         {
@@ -104,6 +108,21 @@
                 <div class="acts">
                     <a class="iw-btn" id="sleevePlay" href="#">▶ 播放</a>
                     <a class="iw-btn iw-btn-ghost" id="sleeveEdit" href="#">重新修圖</a>
+
+                    @*
+                        刪除是不可逆的,所以用兩段式:第一下把按鈕換成「確定刪除」,
+                        第二下才真的送出。不用 confirm() 彈窗——它會擋住整個分頁,
+                        而且在自動化測試裡很難處理。
+                    *@
+                    <form asp-action="Delete" method="post" id="deleteForm" style="display:inline">
+                        <input type="hidden" name="id" id="deleteId" value="" />
+                        <button type="button" class="iw-btn iw-btn-ghost" id="deleteBtn"
+                                style="border-color:rgba(224,96,74,.4);color:#E0604A">刪除</button>
+                    </form>
+                </div>
+                <div class="iw-mono" id="deleteHint" hidden
+                     style="margin-top:12px;color:#E0604A;line-height:1.8">
+                    這會一併刪掉照片與判讀結果,無法復原。再按一次確定。
                 </div>
             </div>
         </section>
@@ -143,11 +162,38 @@
             sleevePlay.href = d.play;
             sleeveEdit.href = d.edit;
 
+            // 換了一卷就把刪除確認狀態重置——不然在 A 按了一次刪除、切到 B,
+            // 第二下會刪到 B。這種「狀態沒跟著切換走」的錯很難在事後查出來。
+            deleteId.value = d.id;
+            resetDelete();
+
             // 重播抽出的動畫
             sleeve.style.animation = 'none';
             void sleeve.offsetWidth;
             sleeve.style.animation = '';
         }
+
+        // ── 刪除的兩段式確認 ─────────────────────────────────────
+        let armed = false;
+        function resetDelete() {
+            armed = false;
+            deleteBtn.textContent = '刪除';
+            deleteHint.hidden = true;
+        }
+        deleteBtn.addEventListener('click', () => {
+            if (!armed) {
+                armed = true;
+                deleteBtn.textContent = '確定刪除';
+                deleteHint.hidden = false;
+                return;
+            }
+            deleteBtn.disabled = true;
+            deleteForm.submit();
+        });
+        // 點到別處就取消,避免按鈕一直停在「確定刪除」的危險狀態
+        document.addEventListener('click', e => {
+            if (armed && e.target !== deleteBtn) resetDelete();
+        });
 
         spines.forEach(s => s.addEventListener('click', () => select(s)));
         select(spines[0]);

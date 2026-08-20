@@ -88,8 +88,13 @@ body.iw{margin:0;background:var(--bg);color:var(--ink);font-family:Archivo,"Noto
 .iw-spine .band{position:absolute;left:0;right:0;pointer-events:none;mix-blend-mode:soft-light}
 .iw-spine .cap{position:relative;flex:none;width:78%;border-radius:1px;opacity:.7;box-shadow:0 1px 3px rgba(0,0,0,.5)}
 .iw-spine .label{position:relative;display:flex;align-items:center;justify-content:center;width:82%;padding:8px 0;overflow:hidden}
-.iw-spine .title{font-family:Oswald,"Noto Serif TC",sans-serif;writing-mode:vertical-rl;text-orientation:upright;
-  font-size:12px;line-height:1;white-space:nowrap;overflow:hidden}
+/* 直排書背標題。
+   text-orientation 用 mixed 而不是 upright:upright 會讓**數字也逐字直立**,
+   「夢幻・08/20」的 0 8 / 2 0 各佔一格,標題吃掉書背一半高度(2026-08-20 回報的跑版)。
+   mixed 讓中文維持直立、數字與拉丁字母旋轉 90° 成一串,長度大約砍半,
+   而且那才是中日文直排的標準排法。 */
+.iw-spine .title{font-family:Oswald,"Noto Serif TC",sans-serif;writing-mode:vertical-rl;text-orientation:mixed;
+  font-size:12px;line-height:1.15;white-space:nowrap;overflow:hidden;max-height:100%}
 .iw-spine.is-on .title{font-size:14px}
 
 /* 選中的那支從架上「浮起來」——這是整頁唯一的動作,其餘保持安靜。
