@@ -68,7 +68,13 @@ public class SongInput
     /// AI 說明「為什麼這首配這張照片」。回落到關鍵字搜尋時是空的
     /// ——那些歌 AI 根本沒看過,不該假造理由。
     /// </summary>
-    public string Why { get; set; } = "";
+    /// <remarks>
+    /// 型別是可為 null 的 string:不可為 null 的參考型別會讓 MVC 自動加 required 驗證,
+    /// 而回落路徑的 Why 本來就是空的,存歌單時會被「The Why field is required.」擋下
+    /// ——n8n 未設定時根本存不了歌單。這正是 PlaylistName/SuggestedName 已經處理過的
+    /// 同一個坑,只是 Why 當初漏掉(2026-08-20 煙霧測試在回落路徑抓到)。
+    /// </remarks>
+    public string? Why { get; set; }
 
     /// <summary>使用者是否勾選要加進歌單</summary>
     public bool Selected { get; set; }
