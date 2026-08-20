@@ -496,3 +496,7 @@ notes/
 # n8n 的資料與檔案(含 workflow、憑證),不進版控
 n8n-data/
 n8n-files/
+
+# 掛載進容器的金鑰檔(Program.cs 讀 secrets/secrets.json)。
+# 本機開發用 user-secrets(在 %APPDATA%),這裡防的是有人為了測試在專案內建了這個檔。
+secrets/

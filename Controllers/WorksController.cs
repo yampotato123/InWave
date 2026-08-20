@@ -140,6 +140,7 @@ public class WorksController : Controller
     {
         var photo = await _db.Photos
             .Include(p => p.Edit)
+            .Include(p => p.Analysis)   // 重修後要作廢舊判讀,先載入才刪得掉
             .FirstOrDefaultAsync(p => p.Id == vm.PhotoId);
         if (photo == null)
             return NotFound();
@@ -196,6 +197,17 @@ public class WorksController : Controller
             : playlistName[..Math.Min(playlistName.Length, 60)];
 
         photo.EditedPath = "/uploads/" + editedName;
+
+        // 重修了圖:濾鏡與亮度/對比/飽和都會進 AI 的 prompt,舊判讀已不對應這張圖。
+        // 直接作廢,下次 Recommend 會用新參數重判(第一次修圖時本來就還沒判讀,刪 null 無影響)。
+        // 代價:回頭重修一定會重打一次 AI;換得的是「改了圖,推薦就跟著變」這個直覺行為,
+        // 使用者不必再自己去按「重新判讀」。
+        if (photo.Analysis != null)
+        {
+            _db.PhotoAnalyses.Remove(photo.Analysis);
+            photo.Analysis = null;
+        }
+
         await _db.SaveChangesAsync();
 
         return RedirectToAction(nameof(Recommend), new { photoId = photo.Id });
@@ -373,8 +385,14 @@ public class WorksController : Controller
         var result = await _analysis.AnalyzeAsync(
             imageBytes: await System.IO.File.ReadAllBytesAsync(fullPath),
             mimeType: MimeTypeOf(fullPath),
-            // MoodName 用空字串當「未指定」的哨兵值(2026-08-17 定案,零 migration)
-            mood: string.IsNullOrEmpty(photo.Mood!.MoodName) ? null : photo.Mood.MoodName,
+            // 只把「使用者自己選的」情緒送給 AI 錨定;AI 自己填的(IsAiFilled)一律送 null。
+            // 否則重判時會把 AI 上次填的值當成使用者指定送回去,prompt 要求原樣回傳,
+            // AI 就永遠改不了自己判過的主情緒——重修也救不回來。送 null 才讓 ApplyMoodPick
+            // 有機會用新結果覆蓋(它只覆蓋 IsAiFilled 的值,使用者選的仍不動)。
+            // MoodName 空字串代表「未指定」(2026-08-17 定案的哨兵值,零 migration)。
+            mood: (!string.IsNullOrEmpty(photo.Mood!.MoodName) && !photo.Mood.IsAiFilled)
+                ? photo.Mood.MoodName
+                : null,
             filter: photo.Edit?.FilterName,
             playlistName: photo.PlaylistName,
             brightness: photo.Edit?.Brightness ?? 100,
@@ -626,6 +644,15 @@ public class WorksController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SavePlaylist(RecommendViewModel vm)
     {
+        // 一律先確認照片存在:PhotoId 亂帶或已被刪時回 404,而不是等到建立 Playlist
+        // 時外鍵失敗才變成 500。順便載入下面命名與重繪都要用的 Mood / Analysis,一次查完。
+        var photo = await _db.Photos
+            .Include(p => p.Mood)
+            .Include(p => p.Analysis)
+            .FirstOrDefaultAsync(p => p.Id == vm.PhotoId);
+        if (photo == null)
+            return NotFound();
+
         var selected = vm.Songs.Where(s => s.Selected).ToList();
         if (selected.Count == 0)
             ModelState.AddModelError("", "至少勾選一首歌。");
@@ -633,29 +660,16 @@ public class WorksController : Controller
         // 名稱留白是允許的:畫面上的 placeholder 已經說明會用什麼名字存。
         // 建議名在伺服器端重算,不採信表單帶回來的值。
         if (string.IsNullOrWhiteSpace(vm.PlaylistName))
-        {
-            var named = await _db.Photos.Include(p => p.Mood)
-                .FirstOrDefaultAsync(p => p.Id == vm.PhotoId);
-            if (named == null)
-                return NotFound();
-            vm.PlaylistName = SuggestNameFor(named);
-        }
+            vm.PlaylistName = SuggestNameFor(photo);
         var playlistName = vm.PlaylistName!.Trim();
 
         if (!ModelState.IsValid)
         {
             // 唯讀的顯示資料一律不放隱藏欄位(表單帶回來的值本來就不會被採用),
-            // 重繪前從資料庫補回去。少了這段,驗證失敗一次「判讀於…／重新判讀」
+            // 重繪前從上面查到的實體補回去。少了這段,驗證失敗一次「判讀於…／重新判讀」
             // 與名稱的 placeholder 就會整組消失。
-            var shown = await _db.Photos
-                .Include(p => p.Mood)
-                .Include(p => p.Analysis)
-                .FirstOrDefaultAsync(p => p.Id == vm.PhotoId);
-            if (shown != null)
-            {
-                vm.AnalyzedAt = shown.Analysis?.AnalyzedAt;
-                vm.SuggestedName = SuggestNameFor(shown);
-            }
+            vm.AnalyzedAt = photo.Analysis?.AnalyzedAt;
+            vm.SuggestedName = SuggestNameFor(photo);
             return View(nameof(Recommend), vm);
         }
 
@@ -667,7 +681,10 @@ public class WorksController : Controller
         };
 
         var sortOrder = 0;
-        foreach (var input in selected)
+        // 同一份歌單同一首歌只留一次。AI 偶爾重複推薦、或表單被竄改時會有重複的 VideoId;
+        // 不先去重的話,同批的第二筆在 Song 還沒 SaveChanges 前查不到而重建,
+        // 會撞上 YoutubeVideoId 唯一索引,整頁 500。
+        foreach (var input in selected.DistinctBy(s => s.VideoId))
         {
             // 同一部影片全站只存一筆 Song,先查再建
             var song = await _db.Songs.FirstOrDefaultAsync(s => s.YoutubeVideoId == input.VideoId)
