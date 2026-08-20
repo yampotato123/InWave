@@ -103,9 +103,10 @@
                     改成放進 placeholder:留白就用它,而「我沒取名」這件事在畫面上是看得見的。
                 *@
                 <div class="iw-mono" style="margin-bottom:10px">歌單名稱 Playlist name</div>
+                @* SuggestedName 只是 placeholder,不放隱藏欄位:存檔時伺服器端會重算,
+                   送回來的值不會被採用 *@
                 <input asp-for="PlaylistName" class="iw-input"
                        placeholder="@Model.SuggestedName" style="font-family:inherit" />
-                <input type="hidden" asp-for="SuggestedName" />
                 <div class="iw-mono" style="font-size:9px;margin-top:8px;color:var(--muted)">
                     留白就用「@Model.SuggestedName」。這個名字只用來存檔 —— AI 判讀在上一步已經完成。
                 </div>

@@ -23,10 +23,14 @@ public class RecommendViewModel
     public string? PlaylistName { get; set; }
 
     /// <summary>
-    /// 留白時要用的建議名稱(情緒・日期),當 placeholder 顯示。
-    /// 實際存檔時由伺服器端重新算一次,不信任表單帶回來的值。
+    /// 留白時要用的建議名稱(情緒・日期),只當 placeholder 顯示。
+    ///
+    /// **不放進表單送回來**:存檔時伺服器端會重新算一次,送回來的值不會被採用,
+    /// 那就沒有理由讓它往返。型別也是可為 null 的 string ——
+    /// 不可為 null 的參考型別會讓 MVC 自動加 required 驗證,
+    /// 而這個欄位在某些路徑上本來就是空的(2026-08-20 被煙霧測試抓到)。
     /// </summary>
-    public string SuggestedName { get; set; } = "";
+    public string? SuggestedName { get; set; }
 
     /// <summary>
     /// AI 判讀的時間;沒判讀過(或判讀失敗)為 null。

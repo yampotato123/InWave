@@ -1,11 +1,11 @@
 @using InWave.Services
 @{
-    ViewData["Title"] = "建立新作品";
+    ViewData["Title"] = "建立歌單";
 }
 
 <main class="iw-page" style="max-width:680px">
     <div class="iw-mono">Step 01</div>
-    <h1 class="iw-serif" style="margin:12px 0 34px;font-size:46px;line-height:1.1">建立新作品</h1>
+    <h1 class="iw-serif" style="margin:12px 0 34px;font-size:46px;line-height:1.1">建立歌單</h1>
 
     <div asp-validation-summary="All" class="iw-errors"></div>
 
@@ -19,20 +19,30 @@
         </div>
 
         <div class="iw-mono" style="margin:34px 0 12px">二 — 這張照片的情緒是?</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
-            @* 空值 = 不指定,由 AI 判讀。預設選它:被逼著八選一時使用者只是挑個最接近的,
-               那不是意圖卻會錨定 AI(設計文件 §3.2.1) *@
-            <input type="radio" class="btn-check" name="moodName" id="mood-auto"
-                   value="" autocomplete="off" checked />
-            <label class="iw-pill is-on" for="mood-auto" style="cursor:pointer">讓 AI 判斷</label>
+
+        @*
+            「讓 AI 判斷」與八個情緒是**兩種不同性質的選擇**,不該混在同一排 ——
+            混排時九顆會把最後一顆擠到第二行,看起來像分組錯誤。
+            預設選「讓 AI 判斷」:被逼著八選一時使用者只是挑個最接近的,
+            那不是意圖卻會錨定 AI(設計文件 §3.2.1)。
+        *@
+        <input type="radio" class="btn-check" name="moodName" id="mood-auto"
+               value="" autocomplete="off" checked />
+        <label class="iw-pill is-on" for="mood-auto" style="cursor:pointer">讓 AI 判斷</label>
+
+        <div class="iw-mono" style="margin:18px 0 10px;font-size:9px;color:var(--muted)">
+            或自己指定
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;max-width:460px">
             @foreach (var mood in MoodKeywordMapper.AllMoods)
             {
                 <input type="radio" class="btn-check" name="moodName" id="mood-@mood"
                        value="@mood" autocomplete="off" />
-                <label class="iw-pill" for="mood-@mood" style="cursor:pointer">@mood</label>
+                <label class="iw-pill" for="mood-@mood"
+                       style="cursor:pointer;text-align:center;justify-content:center">@mood</label>
             }
         </div>
-        <div class="iw-mono" style="margin-top:12px;font-size:10px;color:var(--muted)">
+        <div class="iw-mono" style="margin-top:14px;font-size:10px;color:var(--muted)">
             自己選了就以你的選擇為準;交給 AI 則由照片內容決定
         </div>
 

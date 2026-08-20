@@ -644,12 +644,18 @@ public class WorksController : Controller
 
         if (!ModelState.IsValid)
         {
-            // AnalyzedAt 沒有隱藏欄位(那是唯讀資訊,不該讓表單帶回來),
-            // 重繪前得從資料庫補回去,否則驗證失敗一次「判讀於…／重新判讀」就整組消失。
-            vm.AnalyzedAt = await _db.PhotoAnalyses
-                .Where(a => a.PhotoId == vm.PhotoId)
-                .Select(a => (DateTime?)a.AnalyzedAt)
-                .FirstOrDefaultAsync();
+            // 唯讀的顯示資料一律不放隱藏欄位(表單帶回來的值本來就不會被採用),
+            // 重繪前從資料庫補回去。少了這段,驗證失敗一次「判讀於…／重新判讀」
+            // 與名稱的 placeholder 就會整組消失。
+            var shown = await _db.Photos
+                .Include(p => p.Mood)
+                .Include(p => p.Analysis)
+                .FirstOrDefaultAsync(p => p.Id == vm.PhotoId);
+            if (shown != null)
+            {
+                vm.AnalyzedAt = shown.Analysis?.AnalyzedAt;
+                vm.SuggestedName = SuggestNameFor(shown);
+            }
             return View(nameof(Recommend), vm);
         }
 
