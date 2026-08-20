@@ -100,20 +100,12 @@ public class YouTubeService : IYouTubeService
         if (artist.Length == 0 || title.Length == 0)
             return null;
 
-        // 快取鍵加前綴,與 SearchAsync 的關鍵字搜尋分開,避免兩種語意共用同一筆。
-        // 一律轉小寫:AI 有時回「Beach House」有時回「beach house」,大小寫敏感的話
-        // 同一首歌會各燒一次 100 單位的配額。
-        var cacheKey = $"song:{artist} - {title}".ToLowerInvariant();
-        var cacheCutoff = DateTime.UtcNow - CacheDuration;
-        var cached = await _db.SearchCaches
-            .Where(c => c.Query == cacheKey && c.FetchedAt > cacheCutoff)
-            .OrderByDescending(c => c.FetchedAt)
-            .FirstOrDefaultAsync();
-
+        var cacheKey = CacheKeyFor(artist, title);
+        var cached = await ReadCacheAsync(cacheKey);
         if (cached != null)
         {
             // 空陣列代表「上次找過,確定找不到」——照樣算命中,不要再打 API
-            return JsonSerializer.Deserialize<List<SongResult>>(cached.JsonResult)?.FirstOrDefault();
+            return cached.FirstOrDefault();
         }
 
         var apiKey = _config["YouTube:ApiKey"];
@@ -123,13 +115,128 @@ public class YouTubeService : IYouTubeService
             return null;
         }
 
+        var (ok, picked) = await SearchOneAsync(apiKey, artist, title);
+        if (!ok)
+            return null;   // HTTP/網路出錯,不快取,配額或網路問題排除後應該要能重試
+
+        // 找不到也要快取(存空陣列),否則冷門歌每次重新整理都燒 100 單位
+        AddCache(cacheKey, picked);
+        await _db.SaveChangesAsync();
+
+        if (picked == null)
+            _logger.LogInformation("YouTube 找不到「{Artist} - {Title}」", artist, title);
+
+        return picked;
+    }
+
+    /// <summary>
+    /// 一次找多首(AI 推薦的整組歌)。快取查詢與寫入維持單執行緒(DbContext 非執行緒安全),
+    /// 只有中間對「未命中」歌曲的 YouTube 搜尋並行——首次一組新歌能從「N 次往返疊加」
+    /// 降到約一次往返的時間。命中快取的部分不打 API、也不並行,和逐首查一樣快。
+    /// 回傳與輸入同順序、同長度;無效(空歌手/歌名)、找不到、或 API 出錯的位置為 null。
+    /// </summary>
+    public async Task<IReadOnlyList<SongResult?>> FindVideosAsync(IReadOnlyList<(string Artist, string Title)> songs)
+    {
+        var results = new SongResult?[songs.Count];
+        var cacheKeys = new string?[songs.Count];
+
+        // 1. 循序查快取(只有這裡碰 _db)。命中就填結果,未命中記下 index 待會並行搜尋。
+        var misses = new List<int>();
+        for (var i = 0; i < songs.Count; i++)
+        {
+            var artist = songs[i].Artist.Trim();
+            var title = songs[i].Title.Trim();
+            if (artist.Length == 0 || title.Length == 0)
+                continue;   // 無效,維持 null
+
+            var cacheKey = CacheKeyFor(artist, title);
+            cacheKeys[i] = cacheKey;
+            var cached = await ReadCacheAsync(cacheKey);
+            if (cached != null)
+                results[i] = cached.FirstOrDefault();
+            else
+                misses.Add(i);
+        }
+
+        if (misses.Count == 0)
+            return results;
+
+        var apiKey = _config["YouTube:ApiKey"];
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            _logger.LogWarning("YouTube:ApiKey 未設定,{Count} 首歌無法找影片。", misses.Count);
+            return results;
+        }
+
+        // 2. 未命中的並行打 HTTP。SearchOneAsync 完全不碰 _db,只用 _http(執行緒安全),可安全並行。
+        var searched = await Task.WhenAll(misses.Select(async i =>
+        {
+            var (ok, picked) = await SearchOneAsync(apiKey, songs[i].Artist.Trim(), songs[i].Title.Trim());
+            return (Index: i, Ok: ok, Picked: picked);
+        }));
+
+        // 3. 回到單執行緒寫快取。HTTP 出錯的(Ok=false)不快取,以便稍後重試。
+        var wroteAny = false;
+        foreach (var (index, ok, picked) in searched)
+        {
+            if (!ok)
+                continue;
+            results[index] = picked;
+            AddCache(cacheKeys[index]!, picked);
+            wroteAny = true;
+            if (picked == null)
+                _logger.LogInformation("YouTube 找不到「{Artist} - {Title}」",
+                    songs[index].Artist, songs[index].Title);
+        }
+        if (wroteAny)
+            await _db.SaveChangesAsync();
+
+        return results;
+    }
+
+    // 快取鍵加 song: 前綴,與 SearchAsync 的關鍵字搜尋分開,避免兩種語意共用同一筆。
+    // 一律轉小寫:AI 有時回「Beach House」有時回「beach house」,大小寫敏感的話同一首歌會各燒一次配額。
+    private static string CacheKeyFor(string artist, string title) =>
+        $"song:{artist} - {title}".ToLowerInvariant();
+
+    /// <summary>讀快取:命中回反序列化後的清單(可能是空清單=確定找不到),未命中回 null。只在單執行緒呼叫。</summary>
+    private async Task<List<SongResult>?> ReadCacheAsync(string cacheKey)
+    {
+        var cacheCutoff = DateTime.UtcNow - CacheDuration;
+        var cached = await _db.SearchCaches
+            .Where(c => c.Query == cacheKey && c.FetchedAt > cacheCutoff)
+            .OrderByDescending(c => c.FetchedAt)
+            .FirstOrDefaultAsync();
+        if (cached == null)
+            return null;
+        return JsonSerializer.Deserialize<List<SongResult>>(cached.JsonResult) ?? new();
+    }
+
+    /// <summary>把結果排進待寫入(picked 為 null 就存空陣列)。呼叫端負責 SaveChanges。只在單執行緒呼叫。</summary>
+    private void AddCache(string cacheKey, SongResult? picked)
+    {
+        _db.SearchCaches.Add(new SearchCache
+        {
+            Query = cacheKey,
+            JsonResult = JsonSerializer.Serialize(
+                picked == null ? new List<SongResult>() : new List<SongResult> { picked }),
+            FetchedAt = DateTime.UtcNow,
+        });
+    }
+
+    /// <summary>
+    /// 純 HTTP:對「歌手 + 歌名」搜尋並挑一支影片。**完全不碰 _db**,所以可以安全並行。
+    /// 回 (Ok, Picked):Ok=false 代表 HTTP/網路出錯(呼叫端不要快取,留待重試);
+    /// Ok=true 代表搜尋成功,Picked 可能為 null(這首確實找不到,呼叫端應快取空結果)。
+    /// </summary>
+    private async Task<(bool Ok, SongResult? Picked)> SearchOneAsync(string apiKey, string artist, string title)
+    {
         // 這裡刻意不加 videoCategoryId=10。指名搜尋要的是「那一首」,
-        // 而 OST、動畫歌常被歸在其他分類,加了會找不到。改用下面的挑選規則過濾。
+        // 而 OST、動畫歌常被歸在其他分類,加了會找不到。改用 Pick 的挑選規則過濾。
         var url = "https://www.googleapis.com/youtube/v3/search" +
                   "?part=snippet&type=video&maxResults=5" +
                   $"&q={Uri.EscapeDataString($"{artist} {title}")}&key={apiKey}";
 
-        List<SongResult> candidates;
         try
         {
             using var response = await _http.GetAsync(url);
@@ -137,11 +244,11 @@ public class YouTubeService : IYouTubeService
             {
                 var errorBody = await response.Content.ReadAsStringAsync();
                 _logger.LogError("YouTube API 回應 {Status}:{Body}", response.StatusCode, errorBody);
-                return null;   // 不快取,配額或網路問題排除後應該要能重試
+                return (false, null);
             }
 
             using var json = JsonDocument.Parse(await response.Content.ReadAsStreamAsync());
-            candidates = json.RootElement.GetProperty("items").EnumerateArray()
+            var candidates = json.RootElement.GetProperty("items").EnumerateArray()
                 // 直播與首播嵌入播放常有限制,而且不會是那首歌本身
                 .Where(item => item.GetProperty("snippet").GetProperty("liveBroadcastContent")
                     .GetString() == "none")
@@ -153,29 +260,14 @@ public class YouTubeService : IYouTubeService
                         .GetProperty("medium").GetProperty("url").GetString() ?? ""))
                 .Where(r => r.VideoId != "")
                 .ToList();
+
+            return (true, Pick(candidates, artist));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "呼叫 YouTube API 失敗({Artist} - {Title})", artist, title);
-            return null;
+            return (false, null);
         }
-
-        var picked = Pick(candidates, artist);
-
-        // 找不到也要快取(存空陣列),否則冷門歌每次重新整理都燒 100 單位
-        _db.SearchCaches.Add(new SearchCache
-        {
-            Query = cacheKey,
-            JsonResult = JsonSerializer.Serialize(
-                picked == null ? new List<SongResult>() : new List<SongResult> { picked }),
-            FetchedAt = DateTime.UtcNow,
-        });
-        await _db.SaveChangesAsync();
-
-        if (picked == null)
-            _logger.LogInformation("YouTube 找不到「{Artist} - {Title}」", artist, title);
-
-        return picked;
     }
 
     /// <summary>

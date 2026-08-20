@@ -20,4 +20,12 @@ public interface IYouTubeService
     /// 一次搜尋 100 單位,不快取的話 AI 推的冷門歌每次重新整理都燒一次配額。
     /// </summary>
     Task<SongResult?> FindVideoAsync(string artist, string title);
+
+    /// <summary>
+    /// 一次找多首(AI 推薦的整組歌)。等同於對每首呼叫 <see cref="FindVideoAsync"/>,
+    /// 但未命中快取的那幾首會**並行**打 YouTube API——首次一組新歌的等待從
+    /// 「逐首往返疊加」降到約一次往返的時間。快取查詢與寫入仍是單執行緒(DbContext 非執行緒安全)。
+    /// 回傳與輸入同順序、同長度;無效、找不到、或 API 出錯的位置為 null。
+    /// </summary>
+    Task<IReadOnlyList<SongResult?>> FindVideosAsync(IReadOnlyList<(string Artist, string Title)> songs);
 }

@@ -460,21 +460,24 @@ public class WorksController : Controller
     }
 
     /// <summary>
-    /// 把 AI 推的「歌手 + 歌名」逐首換成可播放的 YouTube 影片。找不到的直接跳過。
+    /// 把 AI 推的「歌手 + 歌名」換成可播放的 YouTube 影片。找不到的直接跳過。
     ///
-    /// 刻意循序而非並行:AppDbContext 不是執行緒安全的,而 FindVideoAsync 會讀寫快取表。
-    /// 五首歌命中快取時只是五次本機查詢,不值得為此引入 scope 管理。
+    /// 交給 FindVideosAsync 一次處理整組:命中快取的照樣是本機查詢,未命中的那幾首
+    /// 才並行打 API(DbContext 的執行緒安全問題留在 service 內處理)。首次一組新歌
+    /// 的等待從「逐首往返疊加」降到約一次往返。
     /// </summary>
     private async Task<List<(SongResult Video, string Why)>> ResolveAsync(IReadOnlyList<AnalyzedSong> songs)
     {
+        var videos = await _youtube.FindVideosAsync(
+            songs.Select(s => (s.Artist, s.Title)).ToList());
+
         var resolved = new List<(SongResult, string)>();
-        foreach (var song in songs)
+        for (var i = 0; i < songs.Count; i++)
         {
-            var found = await _youtube.FindVideoAsync(song.Artist, song.Title);
             // 找到的影片標題是 YouTube 的,而理由是 AI 對「它推的那首歌」寫的——
             // 兩者要一起帶走,否則畫面上就只剩一串沒有脈絡的歌名。
-            if (found != null)
-                resolved.Add((found, song.Why));
+            if (videos[i] != null)
+                resolved.Add((videos[i]!, songs[i].Why));
         }
         return resolved;
     }
