@@ -6,8 +6,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // 掛進來的金鑰檔。優先權最高,蓋過 appsettings.json 與環境變數;檔案不存在就跳過。
 //
-// 誰負責放這個檔,依環境而異——**程式碼不必知道差別**:System.IO.InvalidDataException: 'Failed to load configuration from file 'C:\Users\admin\AppData\Roaming\Microsoft\UserSecrets\23d905ff-b3e8-4062-88ce-cfa5c7e6c3d9\secrets.json'.'
-
+// 誰負責放這個檔,依環境而異——**程式碼不必知道差別**:
 //   開發機   docker-compose.override.yml 把 user-secrets 目錄唯讀掛到 /app/secrets,
 //            所以容器與本機 F5 共用同一份金鑰(容器讀不到 user-secrets:檔案在主機的
 //            %APPDATA%,而且那個組態來源只在 Development 環境才會被加入)
