@@ -12,9 +12,10 @@
 #   .\scripts\deploy-n8n-workflow.ps1     # 部署並啟用
 #
 # 前置:在 n8n UI 產一把 API key(Settings → n8n API → Create an API key),
-#       把它加進專案根目錄的 .env:
-#           N8N_API_KEY=n8n_api_xxxxxxxx
-#       .env 已被 .gitignore 擋住,不會進版控。
+#       scope 只需要 workflow 的 read / update / activate / create,不要給 All。
+#       然後放進 user-secrets(與專案其他金鑰同一個地方):
+#           dotnet user-secrets set "N8n:ApiKey" "n8n_api_xxxxxxxx"
+#       也支援 .env 的 N8N_API_KEY 當退路。
 #
 # 沒有 API key 時會自動退回舊的 CLI + 重啟路徑,腳本仍然可用(只是慢)。
 [CmdletBinding()]
@@ -29,17 +30,26 @@ $repo = Split-Path $PSScriptRoot -Parent
 $jsonPath = Join-Path $repo 'n8n-workflows\inwave-analyze.json'
 if (-not (Test-Path $jsonPath)) { throw "找不到 $jsonPath,先跑 build-n8n-workflow.ps1" }
 
-function Get-EnvValue([string]$key) {
+# 金鑰來源與專案其他地方一致:user-secrets 優先,.env 是退路。
+# 這支腳本只在開發機上跑,所以讀 user-secrets 沒有問題(容器讀不到那個目錄,
+# 但容器也不需要這把金鑰——部署是從主機發起的)。
+function Get-SecretValue([string]$userSecretsKey, [string]$envKey) {
+    $fromSecrets = (dotnet user-secrets list --project (Join-Path $repo 'InWave.csproj') 2>$null |
+        Where-Object { $_ -match "^$([regex]::Escape($userSecretsKey))\s*=" }) -replace '^[^=]+=\s*', ''
+    if (-not [string]::IsNullOrWhiteSpace($fromSecrets)) { return $fromSecrets.Trim() }
+
     $envFile = Join-Path $repo '.env'
-    if (-not (Test-Path $envFile)) { return $null }
-    $line = Get-Content $envFile | Where-Object { $_ -match "^$key=" } | Select-Object -First 1
-    if (-not $line) { return $null }
-    $v = ($line -split '=', 2)[1].Trim()
-    if ([string]::IsNullOrWhiteSpace($v)) { return $null }
-    return $v
+    if (Test-Path $envFile) {
+        $line = Get-Content $envFile | Where-Object { $_ -match "^$([regex]::Escape($envKey))=" } | Select-Object -First 1
+        if ($line) {
+            $v = ($line -split '=', 2)[1].Trim()
+            if (-not [string]::IsNullOrWhiteSpace($v)) { return $v }
+        }
+    }
+    return $null
 }
 
-$apiKey = Get-EnvValue 'N8N_API_KEY'
+$apiKey = Get-SecretValue 'N8n:ApiKey' 'N8N_API_KEY'
 
 # ── 沒有 API key:退回 CLI + 重啟 ─────────────────────────────────
 if (-not $apiKey) {
