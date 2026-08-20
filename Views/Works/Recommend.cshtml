@@ -14,7 +14,7 @@
                 　判讀於 @Model.AnalyzedAt.Value.ToLocalTime().ToString("MM/dd HH:mm")
             </span>
             @* 判讀要 16–105 秒,按鈕送出後停用,避免重複點擊各打一次 AI *@
-            <form asp-action="Reanalyze" method="post" style="display:inline"
+            <form asp-action="Reanalyze" method="post" style="display:inline" data-loading="正在重新為你的照片配樂…"
                   onsubmit="this.querySelector('button').disabled=true;this.querySelector('button').textContent='判讀中…'">
                 <input type="hidden" name="photoId" value="@Model.PhotoId" />
                 <button type="submit" class="iw-pill" style="margin-left:10px">重新判讀</button>

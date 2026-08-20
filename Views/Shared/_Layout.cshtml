@@ -44,6 +44,15 @@
 
     @RenderBody()
 
+    @* 判讀/找歌的等待遮罩。預設隱藏,由 data-loading 觸發(site.js);放在 Layout 一份,全站共用。 *@
+    <div class="iw-loading" id="iwLoading" role="status" aria-live="polite">
+        <div class="card">
+            <div class="eq"><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="msg" data-loading-text>正在為你的照片配樂…</div>
+            <div class="iw-mono sub">AI 正在讀這張照片的氣氛,大約 10–100 秒。請不要關閉或重新整理這個分頁</div>
+        </div>
+    </div>
+
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>

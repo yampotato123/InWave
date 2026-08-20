@@ -15,7 +15,7 @@
 
 <div asp-validation-summary="All" class="iw-errors" style="margin:20px 40px 0"></div>
 
-<form asp-action="Edit" method="post" class="iw-edit" id="editForm">
+<form asp-action="Edit" method="post" class="iw-edit" id="editForm" data-loading="正在為你的照片配樂…">
     <input type="hidden" asp-for="PhotoId" />
     <input type="hidden" asp-for="EditedImage" id="editedImage" />
 
@@ -147,7 +147,8 @@
         <div style="margin-top:auto;display:flex;flex-direction:column;gap:9px">
             <button class="iw-btn" type="submit">完成,取得推薦 →</button>
             <button class="iw-btn iw-btn-ghost" type="button" id="reset">還原 Reset</button>
-            <a class="iw-btn iw-btn-ghost" asp-action="Recommend" asp-route-photoId="@Model.PhotoId">略過修圖 Skip</a>
+            <a class="iw-btn iw-btn-ghost" asp-action="Recommend" asp-route-photoId="@Model.PhotoId"
+               data-loading="正在為你的照片配樂…">略過修圖 Skip</a>
         </div>
     </aside>
 </form>

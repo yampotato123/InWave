@@ -460,3 +460,28 @@ body:has(.iw-edit){--iw-center-x:calc((100% - 400px) / 2)}
 .iw-spine.s28 .label{max-height:88px;flex:none;border-radius:2px;background:linear-gradient(180deg,#F5D020,#F5D020d9);box-shadow:0 1px 0 rgba(255,255,255,.5),0 6px 14px rgba(0,0,0,.45)}
 .iw-spine.s28 .title{color:#141200;font-weight:800;letter-spacing:0}
 .iw-spine.s28 .art{width:64%;height:9px;border-radius:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent)}
+
+/* ===== 等待遮罩:AI 判讀 / 找歌時蓋在整頁上 ===== */
+/* 判讀要 8–105 秒,而 Recommend 是伺服器同步 blocking——頁面 HTML 要等判讀完才吐出來,
+   前端來不及在「目標頁」顯示 loading。所以遮罩在「離開的那一頁」顯示,一路撐到新頁
+   HTML 回來取代整頁。觸發方式:任何元素加 data-loading(見 site.js),不必每頁各寫一份。 */
+.iw-loading{position:fixed;inset:0;z-index:100;display:none;place-items:center;
+  background:rgba(0,0,0,.74);backdrop-filter:blur(12px)}
+.iw-loading.is-on{display:grid}
+.iw-loading .card{display:flex;flex-direction:column;align-items:center;gap:24px;padding:0 32px;text-align:center}
+/* 五根 bar 上下跳,比轉圈更貼「配樂」的主題。沿用既有的 iw-wave keyframe。 */
+.iw-loading .eq{display:flex;align-items:flex-end;gap:6px;height:48px}
+.iw-loading .eq i{width:6px;height:100%;border-radius:3px;transform-origin:bottom;
+  background:linear-gradient(180deg,var(--accent),var(--accent-2));animation:iw-wave 1s ease-in-out infinite}
+.iw-loading .eq i:nth-child(2){animation-delay:.15s}
+.iw-loading .eq i:nth-child(3){animation-delay:.3s}
+.iw-loading .eq i:nth-child(4){animation-delay:.45s}
+.iw-loading .eq i:nth-child(5){animation-delay:.6s}
+.iw-loading .msg{font-family:"Instrument Serif","Noto Serif TC",serif;font-size:23px;line-height:1.3;color:var(--ink)}
+.iw-loading .sub{max-width:300px;line-height:1.9}
+/* 關動態時 bar 不跳,但定在高低不一的高度,仍看得出是「進行中」而不是壞掉 */
+@media (prefers-reduced-motion:reduce){
+  .iw-loading .eq i{animation:none}
+  .iw-loading .eq i:nth-child(odd){height:60%}
+  .iw-loading .eq i:nth-child(even){height:92%}
+}
