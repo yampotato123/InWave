@@ -170,6 +170,15 @@ body.iw{margin:0;background:var(--bg);color:var(--ink);font-family:Archivo,"Noto
 .iw-errors ul{margin:0;padding-left:18px}
 .validation-summary-valid{display:none}
 
+/* <details> 的展開箭頭:Chrome 與 Safari 各有自己的預設標記,一併關掉,
+   由 summary 裡的 ▾ 自己表示狀態(展開時轉 180°)。 */
+details > summary::-webkit-details-marker{display:none}
+details > summary{transition:color .18s ease}
+details > summary:hover{color:var(--ink)}
+details[open] > summary{color:var(--ink)}
+details[open] > summary::after{content:""}
+details > summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
+
 /* 一般文字輸入框(修圖頁的歌單名稱等)。與 .iw-glass 同一套語彙,但不加 backdrop-filter——
    那東西每一個都要付合成成本,表單欄位不值得。 */
 .iw-input{width:100%;box-sizing:border-box;padding:12px 14px;border-radius:10px;

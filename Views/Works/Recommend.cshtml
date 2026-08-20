@@ -34,6 +34,58 @@
                 <img src="@Model.PhotoPath" alt="作品照片"
                      style="width:100%;border-radius:10px;display:block" />
             </div>
+
+            @*
+                AI 怎麼看這張照片。這些資料判讀時就有了(存在 PhotoAnalysis.RawJson),
+                先前完全沒顯示——拿出來,使用者才看得出它真的看過照片。
+                用 <details> 而不是自製摺疊:原生、可鍵盤操作、不需要 JS。
+            *@
+            @if (Model.Scene != null || Model.Mood.Count > 0)
+            {
+                <details class="iw-glass" style="margin-top:14px;padding:14px 16px">
+                    <summary class="iw-mono" style="cursor:pointer;list-style:none">
+                        AI 怎麼看這張照片 ▾
+                    </summary>
+                    <div style="margin-top:14px;display:flex;flex-direction:column;gap:12px;font-size:13px">
+                        @if (!string.IsNullOrWhiteSpace(Model.Scene))
+                        {
+                            <div>
+                                <div class="iw-mono" style="font-size:9px;margin-bottom:5px">看到的場景</div>
+                                <div>@Model.Scene</div>
+                            </div>
+                        }
+                        @if (Model.Mood.Count > 0)
+                        {
+                            <div>
+                                <div class="iw-mono" style="font-size:9px;margin-bottom:5px">氣氛</div>
+                                <div>@string.Join(" · ", Model.Mood)</div>
+                            </div>
+                        }
+                        @if (Model.Keywords.Count > 0)
+                        {
+                            <div>
+                                <div class="iw-mono" style="font-size:9px;margin-bottom:5px">備用搜尋詞</div>
+                                <div style="color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:11px">
+                                    @string.Join("  /  ", Model.Keywords)
+                                </div>
+                                <div class="iw-mono" style="font-size:9px;margin-top:5px;color:var(--muted)">
+                                    只有五首全找不到時才會用到
+                                </div>
+                            </div>
+                        }
+                        @if (Model.AnalyzedAt != null)
+                        {
+                            <div class="iw-mono" style="font-size:9px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">
+                                @Model.AnalyzedAt.Value.ToLocalTime().ToString("MM/dd HH:mm")
+                                @if (!string.IsNullOrWhiteSpace(Model.ModelUsed))
+                                {
+                                    <span>　@Model.ModelUsed</span>
+                                }
+                            </div>
+                        }
+                    </div>
+                </details>
+            }
         </div>
 
         <div>
@@ -78,6 +130,8 @@
                             <input type="hidden" asp-for="Songs[i].Title" />
                             <input type="hidden" asp-for="Songs[i].Artist" />
                             <input type="hidden" asp-for="Songs[i].ThumbnailUrl" />
+                            @* 理由不存進資料庫,但要跟著表單回來,否則驗證失敗重繪時會整排消失 *@
+                            <input type="hidden" asp-for="Songs[i].Why" />
 
                             <input class="form-check-input" type="checkbox" asp-for="Songs[i].Selected"
                                    title="加入歌單" style="flex:none" />
@@ -86,6 +140,14 @@
                             <span style="min-width:0;flex:1;display:flex;flex-direction:column;gap:3px">
                                 <span style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">@Model.Songs[i].Title</span>
                                 <span style="font-size:11px;color:rgba(255,255,255,.45);font-weight:300">@Model.Songs[i].Artist</span>
+                                @* AI 說明為什麼這首配這張照片。回落路徑沒有理由,那時就不顯示——
+                                   那些歌 AI 沒看過,擺一句假的說明比空白更糟。 *@
+                                @if (!string.IsNullOrWhiteSpace(@Model.Songs[i].Why))
+                                {
+                                    <span style="font-size:11px;color:var(--accent);opacity:.85;font-weight:300">
+                                        @Model.Songs[i].Why
+                                    </span>
+                                }
                             </span>
                             <button type="button" class="iw-pill preview-btn" data-video-id="@Model.Songs[i].VideoId">試聽</button>
                         </div>

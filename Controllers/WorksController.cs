@@ -236,7 +236,9 @@ public class WorksController : Controller
 
         // 主線:AI 看照片推的歌。AI 沒判成、或推的歌一首都在 YouTube 上找不到時,
         // 回落到規則關鍵字搜尋——功能不會因為 AI 掛掉而消失。
-        var results = new List<SongResult>();
+        // 每一筆都帶著 AI 給的理由(why)。那是判讀時就拿到的東西,
+        // 先前一直沒拿出來用——畫面上顯示「為什麼推這首」,產品才看得出有在思考。
+        var results = new List<(SongResult Video, string Why)>();
         var keyword = MoodKeywordMapper.GetKeyword(photo.Mood.MoodName, photo.Edit?.FilterName);
         var searchDescription = keyword;
 
@@ -257,8 +259,9 @@ public class WorksController : Controller
             }
         }
 
+        // 回落路徑沒有 why——那是關鍵字搜尋的結果,AI 根本沒看過這幾首
         if (results.Count == 0)
-            results = await _youtube.SearchAsync(keyword);
+            results = (await _youtube.SearchAsync(keyword)).Select(r => (r, "")).ToList();
 
         var vm = new RecommendViewModel
         {
@@ -270,12 +273,20 @@ public class WorksController : Controller
             PlaylistName = photo.PlaylistName ?? "",
             SuggestedName = SuggestNameFor(photo),
             AnalyzedAt = photo.Analysis?.AnalyzedAt,
+
+            // AI 怎麼看這張照片——判讀時就有的資料,只是先前沒顯示
+            Scene = analysis is { Ok: true } ? analysis.Scene : null,
+            Mood = analysis is { Ok: true } ? analysis.Mood : Array.Empty<string>(),
+            Keywords = analysis is { Ok: true } ? analysis.Keywords : Array.Empty<string>(),
+            ModelUsed = photo.Analysis?.ModelUsed,
+
             Songs = results.Select(r => new SongInput
             {
-                VideoId = r.VideoId,
-                Title = r.Title,
-                Artist = r.Artist,
-                ThumbnailUrl = r.ThumbnailUrl,
+                VideoId = r.Video.VideoId,
+                Title = r.Video.Title,
+                Artist = r.Video.Artist,
+                ThumbnailUrl = r.Video.ThumbnailUrl,
+                Why = r.Why,
                 Selected = true, // 預設全選,使用者取消不要的
             }).ToList(),
         };
@@ -436,14 +447,16 @@ public class WorksController : Controller
     /// 刻意循序而非並行:AppDbContext 不是執行緒安全的,而 FindVideoAsync 會讀寫快取表。
     /// 五首歌命中快取時只是五次本機查詢,不值得為此引入 scope 管理。
     /// </summary>
-    private async Task<List<SongResult>> ResolveAsync(IReadOnlyList<AnalyzedSong> songs)
+    private async Task<List<(SongResult Video, string Why)>> ResolveAsync(IReadOnlyList<AnalyzedSong> songs)
     {
-        var resolved = new List<SongResult>();
+        var resolved = new List<(SongResult, string)>();
         foreach (var song in songs)
         {
             var found = await _youtube.FindVideoAsync(song.Artist, song.Title);
+            // 找到的影片標題是 YouTube 的,而理由是 AI 對「它推的那首歌」寫的——
+            // 兩者要一起帶走,否則畫面上就只剩一串沒有脈絡的歌名。
             if (found != null)
-                resolved.Add(found);
+                resolved.Add((found, song.Why));
         }
         return resolved;
     }

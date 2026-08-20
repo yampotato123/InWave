@@ -34,6 +34,22 @@ public class RecommendViewModel
     /// </summary>
     public DateTime? AnalyzedAt { get; set; }
 
+    // ── AI 怎麼看這張照片 ─────────────────────────────────────────
+    // 這些在判讀時就拿到了,存在 PhotoAnalysis.RawJson 裡,先前完全沒顯示。
+    // 拿出來給使用者看,產品才看得出「它真的看過照片」而不是隨機推歌。
+
+    /// <summary>AI 對照片的一句話描述</summary>
+    public string? Scene { get; set; }
+
+    /// <summary>AI 給的氣氛形容詞(自由詞彙,與八種情緒無關)</summary>
+    public IReadOnlyList<string> Mood { get; set; } = Array.Empty<string>();
+
+    /// <summary>備用搜尋詞。只有五首歌全找不到時才會用到,顯示出來是為了讓判讀過程可檢視。</summary>
+    public IReadOnlyList<string> Keywords { get; set; } = Array.Empty<string>();
+
+    /// <summary>判讀用的模型,顯示在詳情面板</summary>
+    public string? ModelUsed { get; set; }
+
     public List<SongInput> Songs { get; set; } = new();
 }
 
@@ -43,6 +59,12 @@ public class SongInput
     public string Title { get; set; } = "";
     public string Artist { get; set; } = "";
     public string ThumbnailUrl { get; set; } = "";
+
+    /// <summary>
+    /// AI 說明「為什麼這首配這張照片」。回落到關鍵字搜尋時是空的
+    /// ——那些歌 AI 根本沒看過,不該假造理由。
+    /// </summary>
+    public string Why { get; set; } = "";
 
     /// <summary>使用者是否勾選要加進歌單</summary>
     public bool Selected { get; set; }
