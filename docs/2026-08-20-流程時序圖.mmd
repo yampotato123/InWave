@@ -1,0 +1,86 @@
+%% InWave 主流程時序圖
+%% 一張照片從進入系統到變成可播放歌單。
+%% 冷路徑與熱路徑的差別、以及 AI 失敗時的回落,都畫在同一張裡。
+%%
+%% 渲染:VS Code 的 Markdown Preview Mermaid Support、GitHub、或 mermaid.live
+
+sequenceDiagram
+    autonumber
+    actor U as 使用者
+    participant B as 瀏覽器
+    participant A as InWave · ASP.NET
+    participant D as SQLite
+    participant N as n8n
+    participant M as 視覺模型
+    participant Y as YouTube API
+
+    %% ── 一 上傳 ──────────────────────────────────────
+    Note over B: 上傳前先在瀏覽器縮圖<br/>長邊 1600,與匯出同值
+    U->>B: 選照片,情緒可不選
+    B->>B: canvas 縮圖 → JPEG q0.9
+    B->>A: POST /Works/Create  multipart
+    A->>A: 檔名重新產生為 GUID
+    A->>D: 寫 Photo + MoodProfile
+    Note right of D: MoodName 空字串<br/>= 使用者未指定
+    A-->>B: 302 → /Works/Edit
+
+    %% ── 二 修圖 ──────────────────────────────────────
+    B->>B: canvas 載入原圖<br/>ctx.filter 濾鏡鏈
+    Note over B: 銳化與色調曲線是 SVG 濾鏡<br/>GPU 運算,無逐像素 JS
+    U->>B: 調整滑桿與曲線,可為歌單取名
+    B->>A: POST /Works/Edit  合成圖 data URL
+    A->>D: 寫 PhotoEdit + Photo.PlaylistName
+    A-->>B: 302 → /Works/Recommend
+
+    %% ── 三 判讀 ──────────────────────────────────────
+    B->>A: GET /Works/Recommend
+    A->>D: 讀 Photo 含 Mood / Edit / Analysis
+
+    alt 尚未判讀過 — 冷路徑
+        A->>A: 讀原圖 bytes → base64
+        Note over A: 送的是原圖,不是合成圖<br/>濾鏡以文字進 prompt,否則會算兩次
+        A->>N: POST /webhook/inwave/analyze<br/>沒表態的欄位整個不送
+        N->>N: Build Prompt<br/>基礎段 + 四個條件段
+        N->>M: image analyze
+        M-->>N: 文字,可能帶 json 圍欄
+        N->>N: 拆圍欄,標註 ok 與 model<br/>放在展開之後,AI 覆寫不了
+        N-->>A: ok / scene / moodPick / mood / keywords / songs
+        A->>A: 先驗型別再取值<br/>moodPick 必須落在八種內
+        A->>D: 寫 PhotoAnalysis
+        Note right of D: 唯一索引 + catch DbUpdateException<br/>併發時改用別人存好的那筆
+        A->>D: moodPick 回填 MoodProfile
+
+    else 已判讀過 — 熱路徑
+        A->>A: ParseRaw 讀 RawJson<br/>與首次判讀共用同一段解析
+        Note over A: 完全不碰 n8n
+
+    else 判讀失敗 — NETWORK / TIMEOUT / AI_UNAVAILABLE
+        Note over A: 不寫入資料庫<br/>否則這張照片永遠不會再判讀
+        A->>Y: 關鍵字搜尋 MoodKeywordMapper
+        Y-->>A: 泛用結果
+    end
+
+    %% ── 四 找影片 ────────────────────────────────────
+    loop 每首歌,最多 5 首
+        A->>D: 查 SearchCache<br/>鍵 song 歌手 歌名,全小寫
+        alt 快取命中
+            D-->>A: 影片或空陣列
+            Note right of D: 空陣列 = 上次確定找不到<br/>不再燒 100 單位
+        else 未命中
+            A->>Y: search 指名查詢,maxResults 5
+            Y-->>A: 候選 5 筆
+            A->>A: 過濾直播<br/>Topic且含歌手名 → 含歌手名 → Topic → 第一筆
+            A->>D: 寫 SearchCache,找不到也寫
+        end
+    end
+
+    A-->>B: 推薦頁 HTML<br/>含每首歌的 AI 理由與判讀詳情
+
+    %% ── 五 存檔與播放 ────────────────────────────────
+    U->>B: 勾選要收的歌
+    B->>A: POST /Works/SavePlaylist
+    Note over A: 名稱留白時由伺服器端補建議名
+    A->>D: 寫 Playlist + Song + PlaylistSong
+    A-->>B: 302 → /Works/Details
+
+    B->>B: YouTube IFrame API<br/>自製播放列與進度條
