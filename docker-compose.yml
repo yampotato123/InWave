@@ -67,6 +67,13 @@ services:
       # 結果是把資料庫掛進原始碼目錄。Linux 上不會發生,所以很難事後發現。
       - ./docker-data:/app/docker-data          # SQLite 資料庫
       - ./wwwroot/uploads:/app/wwwroot/uploads  # 使用者上傳的照片
+      #
+      # ⚠️ 容器以非 root(UID 1654)執行,所以上面這兩個目錄**與其中既有的檔案**
+      #    都要讓 1654 寫得進去。若是從先前 root 版本升級上來,舊檔的擁有者是
+      #    root,啟動會炸 `SQLite Error 8: attempt to write a readonly database`。
+      #    一次性修正:
+      #      docker run --rm -u 0 -v "${PWD}/docker-data:/x" -v "${PWD}/wwwroot/uploads:/y" \
+      #        mcr.microsoft.com/dotnet/aspnet:10.0 chown -R 1654:1654 /x /y
 
       # 金鑰不掛在這裡。本檔是**正式部署也能直接用**的基礎設定,
       # 金鑰由環境變數(上方)或平台的 secret volume 掛到 /app/secrets 提供。

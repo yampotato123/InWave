@@ -200,6 +200,34 @@ docker compose -f docker-compose.yml up -d
 （Kubernetes Secret、Azure Container Apps 的 secret 掛載都是檔案）。
 掛檔案的好處是**輪替金鑰不必重啟**——與開發機同一套機制，程式碼不必知道差別。
 
+### 容器以非 root 執行
+
+映像檔最後會切到 UID **1654**（官方 aspnet 映像檔內建的 `app` 使用者）。
+理由：這個站沒有認證機制又接受檔案上傳，沒有用 root 跑的道理；
+容器逃逸或應用程式被攻破時，root 的破壞力大得多。
+埠用 8080 也是配套 —— 1024 以下的埠只有 root 能綁。
+
+**掛載進來的目錄與其中的既有檔案都要讓 1654 寫得進去。**
+從先前的 root 版本升級上來時，舊檔的擁有者是 root，啟動會炸：
+
+```
+SQLite Error 8: 'attempt to write a readonly database'
+```
+
+一次性修正（跑一個 root 的臨時容器改擁有權，只需要做一次）：
+
+```powershell
+docker run --rm -u 0 `
+  -v "${PWD}\docker-data:/x" -v "${PWD}\wwwroot\uploads:/y" `
+  mcr.microsoft.com/dotnet/aspnet:10.0 chown -R 1654:1654 /x /y
+```
+
+Linux 主機上同理，也可以直接 `sudo chown -R 1654:1654 docker-data wwwroot/uploads`。
+
+> 為什麼目錄本身沒問題、只有檔案有問題：Docker Desktop 把 Windows 目錄掛進來時
+> 是 `drwxrwxrwx`（任何人都能在裡面建檔），但**既有檔案**保留建立時的擁有者。
+> 所以 `-shm` / `-wal` 這些新檔沒事，先前 root 建的 `.db` 才是卡住的那個。
+
 > `DOTNET_USE_POLLING_FILE_WATCHER=true` 不能拿掉。掛載進容器的檔案**不會傳遞
 > inotify 事件**（Windows→Linux 的 bind mount、Kubernetes 的 Secret volume 都一樣），
 > 預設的檔案監看器永遠不會被觸發，換了金鑰也不會生效。這點實測過確實不會，

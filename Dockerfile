@@ -44,4 +44,27 @@ EXPOSE 8080
 
 COPY --from=build /app/publish .
 
+# ------------------------------------------------------------
+# 以非 root 身分執行
+# ------------------------------------------------------------
+# 官方 aspnet 映像檔內建一個 UID 1654 的 app 使用者,但**預設不會切過去**,
+# 所以不寫這幾行的話容器是用 root 跑的(可用 `docker exec inwave id` 確認)。
+#
+# 為什麼要切:容器逃逸或應用程式被攻破時,root 的破壞力大得多。
+# 這個站沒有認證機制、又接受檔案上傳,更沒有理由用 root 跑。
+#
+# 埠 8080 是刻意的:1024 以下的埠只有 root 能綁,
+# 這也是 .NET 8 起把預設埠從 80 改成 8080 的原因。
+ARG APP_UID=1654
+
+# 執行期要寫入的兩個目錄先建好並轉移擁有權。
+# compose 會把主機目錄掛到這兩個路徑上蓋掉內容,但:
+#   - Windows/Docker Desktop:掛載層不套用 Linux 擁有權,寫入不受影響
+#   - Linux:主機端目錄的擁有者要能讓 UID 1654 寫入(見 README)
+# 沒有掛載時(例如單獨跑映像檔)則靠這裡建立的擁有權。
+RUN mkdir -p /app/docker-data /app/wwwroot/uploads \
+ && chown -R $APP_UID:$APP_UID /app
+
+USER $APP_UID
+
 ENTRYPOINT ["dotnet", "InWave.dll"]
